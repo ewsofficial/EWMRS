@@ -44,8 +44,8 @@ class GUILayerRenderer:
                     interpolate = cmap.get("interpolate", True)
                     return np.array(thresholds), np.array(colors, dtype=np.float32), interpolate
         
-        # If key not found, raise an error
-        raise ValueError(f"Colormap '{self.colormap_key}' not found in colormaps.json")
+        # If key not found, raise an error with the path we tried
+        raise ValueError(f"Colormap '{self.colormap_key}' not found in {fs.GUI_COLORMAP_JSON}")
 
     def convert_to_png(self):
         """

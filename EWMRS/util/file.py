@@ -65,7 +65,22 @@ GUI_RHOHV_DIR = GUI_DIR / "RhoHV"
 GUI_PRECIPTYP_DIR = GUI_DIR / "PrecipFlag"
 GUI_MAP_DIR = GUI_DIR / "maps"
 GUI_MANIFEST_JSON = GUI_DIR / "overlay_manifest.json"
-GUI_COLORMAP_JSON = Path("colormaps.json")
+# Attempt to locate `colormaps.json` in a few sensible places so the render
+# package can find it regardless of the current working directory.
+_cwd_candidate = Path.cwd() / "colormaps.json"
+_pkg_candidate = Path(__file__).resolve().parents[1] / "colormaps.json"  # EWMRS/colormaps.json
+_repo_candidate = Path(__file__).resolve().parents[2] / "colormaps.json"  # repo root/colormaps.json
+_gui_candidate = GUI_DIR / "colormaps.json"
+
+for _candidate in (_cwd_candidate, _pkg_candidate, _repo_candidate, _gui_candidate):
+    if _candidate.exists():
+        GUI_COLORMAP_JSON = _candidate
+        io_manager.write_debug(f"Using colormap JSON: {_candidate}")
+        break
+else:
+    # fallback to previous behavior (relative path) and warn
+    GUI_COLORMAP_JSON = Path("colormaps.json")
+    io_manager.write_warning("colormaps.json not found in common locations; using relative path 'colormaps.json'")
 
 # NEW LATEST FILES FUNCTION
 def latest_files(dir, n):
