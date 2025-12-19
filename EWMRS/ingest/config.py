@@ -1,4 +1,4 @@
-from util.file import *
+from ..util.file import *
 
 bucket = "noaa-mrms-pds"
 goes_bucket = "noaa-goes19"
