@@ -1,0 +1,21 @@
+{
+  "name": "ewmrs",
+  "version": "1.0.0",
+  "description": "Edgemont Weather Map Rendering Service",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ewsofficial/EWMRS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ewsofficial/EWMRS/issues"
+  },
+  "homepage": "https://github.com/ewsofficial/EWMRS#readme"
+}
