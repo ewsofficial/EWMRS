@@ -1,0 +1,19 @@
+name: ewmrs
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - boto3
+  - aioboto3
+  - botocore
+  - xarray
+  - netcdf4
+  - cfgrib
+  - aiofiles
+  - numpy
+  - pip:
+    - pytest
+    - pytest-cov
+    - pre-commit
