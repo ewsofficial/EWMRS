@@ -9,10 +9,10 @@ from util.io import IOManager
 io_manager = IOManager("[Util]")
 
 if platform.system() == "Windows":
-    BASE_DIR = Path(r"C:\EdgeWARN_input")
+    BASE_DIR = Path(r"C:\EWMRS")
 
 else:
-    BASE_DIR = Path(r"/workspaces/EdgeWARN_input")
+    BASE_DIR = Path(r"/workspaces/EWMRS")
 
 # ---------- PATH CONFIG ----------
 DATA_DIR = BASE_DIR / "data"
