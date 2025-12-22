@@ -4,7 +4,8 @@
   "description": "Edgemont Weather Map Rendering Service",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start:api": "node EWMRS/api/server.js"
   },
   "repository": {
     "type": "git",
@@ -14,6 +15,11 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "morgan": "^1.10.0"
+  },
   "bugs": {
     "url": "https://github.com/ewsofficial/EWMRS/issues"
   },
