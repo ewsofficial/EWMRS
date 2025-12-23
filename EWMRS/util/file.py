@@ -4,17 +4,6 @@ import os
 import platform
 from datetime import datetime
 
-# Ensure the repository `src` directory is on sys.path so top-level imports
-# like `from util.io import IOManager` work when files are executed directly.
-try:
-    _SRC_DIR = Path(__file__).resolve().parents[1]
-    _src_str = str(_SRC_DIR)
-    if _src_str not in sys.path:
-        sys.path.insert(0, _src_str)
-except Exception:
-    # Best-effort only; fall back to normal import errors if this fails
-    pass
-
 from util.io import IOManager
 
 io_manager = IOManager("[Util]")
