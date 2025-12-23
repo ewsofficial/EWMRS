@@ -160,17 +160,5 @@ def clean_old_files(directory: Path, max_age_minutes=60):
             except Exception as e:
                 io_manager.write_error(f"Could not process/delete {f.name}: {e}")
 
-    # If more than 10 files remain, delete the oldest ones until only 10 are left
-    if len(kept_files) > 10:
-        kept_files.sort(key=lambda x: x[1]) # Sort by mtime (oldest first)
-        files_to_remove = len(kept_files) - 10
-        for i in range(files_to_remove):
-            f, _ = kept_files[i]
-            try:
-                f.unlink()
-                files_deleted += 1
-            except Exception as e:
-                io_manager.write_error(f"Could not delete {f.name}: {e}")
-
     if files_deleted > 0:
         io_manager.write_debug(f"Deleted {files_deleted} files in {directory}")
