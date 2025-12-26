@@ -9,14 +9,18 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from .ingest.main import download_all_files
-from .render.tools import TransformUtils
-from .render.render import GUILayerRenderer
-from .render.config import file_list
-from .util import file as fs
-from .util.io import IOManager, TimestampedOutput, QueueWriter
-from .scheduler import MRMSUpdateChecker
-from .ingest.config import check_modifiers
+# Allow running from root directory
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from EWMRS.ingest.main import download_all_files
+from EWMRS.render.tools import TransformUtils
+from EWMRS.render.render import GUILayerRenderer
+from EWMRS.render.config import file_list
+from EWMRS.util import file as fs
+from EWMRS.util.io import IOManager, TimestampedOutput, QueueWriter
+from EWMRS.scheduler import MRMSUpdateChecker
+from EWMRS.ingest.config import check_modifiers
 
 # Timestamp outputs globally
 sys.stdout = TimestampedOutput(sys.stdout)
