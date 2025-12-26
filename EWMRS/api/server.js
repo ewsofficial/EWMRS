@@ -11,22 +11,22 @@ app.use(morgan('tiny'));
 // Determine BASE_DIR with parity to Python `util/file.py` behaviour but
 // supporting multiple environments:
 // - If `BASE_DIR` env var is set, use it.
-// - On Windows: `C:\EdgeWARN_input`
+// - On Windows: `C:\EWMRS`
 // - On Linux/macOS inside a GitHub/workspaces container (cwd starts with `/workspaces`):
-//   `/workspaces/EdgeWARN_input`
-// - Otherwise on Linux/macOS: `/home/EdgeWARN_input`
+//   `/workspaces/EWMRS`
+// - Otherwise on Linux/macOS: `/home/EWMRS`
 const envBase = process.env.BASE_DIR;
 let BASE_DIR;
 if (envBase) {
   BASE_DIR = envBase;
 } else if (process.platform === 'win32') {
-  BASE_DIR = 'C:\\EdgeWARN_input';
+  BASE_DIR = 'C:\\EWMRS';
 } else {
   const cwd = process.cwd() || '';
   if (cwd.startsWith('/workspaces')) {
-    BASE_DIR = '/workspaces/EdgeWARN_input';
+    BASE_DIR = '/workspaces/EWMRS';
   } else {
-    BASE_DIR = '/home/EdgeWARN_input';
+    BASE_DIR = '/home/EWMRS';
   }
 }
 

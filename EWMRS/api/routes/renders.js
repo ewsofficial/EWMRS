@@ -32,13 +32,13 @@ let BASE_DIR;
 if (envBase) {
   BASE_DIR = envBase;
 } else if (process.platform === 'win32') {
-  BASE_DIR = 'C:\\EdgeWARN_input';
+  BASE_DIR = 'C:\\EWMRS';
 } else {
   const cwd = process.cwd() || '';
   if (cwd.startsWith('/workspaces')) {
-    BASE_DIR = '/workspaces/EdgeWARN_input';
+    BASE_DIR = '/workspaces/EWMRS';
   } else {
-    BASE_DIR = '/home/EdgeWARN_input';
+    BASE_DIR = '/home/EWMRS';
   }
 }
 const GUI_DIR = path.join(BASE_DIR, 'gui');
