@@ -95,7 +95,8 @@ class GUILayerRenderer:
             cleaned_ts = TransformUtils.find_timestamp(self.timestamp)
             dt = datetime.fromisoformat(cleaned_ts)
         
-        timestamp = dt.strftime(r"%Y%m%d-%H%M%S")
+        # Force seconds to 00 for consistency and fast lookup
+        timestamp = dt.strftime(r"%Y%m%d-%H%M00")
 
         # Ensure the output directory exists
         self.outdir.mkdir(parents=True, exist_ok=True)
@@ -109,6 +110,32 @@ class GUILayerRenderer:
 
         io_manager.write_debug(f"Saved {self.file_name} PNG file to {png_file}")
 
-
+        # Update index.json
+        self._update_index(timestamp)
 
         return png_file, timestamp
+
+    def _update_index(self, new_timestamp):
+        """
+        Updates the index.json file in the output directory with the new timestamp.
+        Maintains a sorted, unique list of timestamps.
+        """
+        index_file = self.outdir / "index.json"
+        timestamps = []
+
+        if index_file.exists():
+            try:
+                with open(index_file, 'r') as f:
+                    timestamps = json.load(f)
+            except Exception as e:
+                io_manager.write_warning(f"Failed to read index.json in {self.outdir}: {e}. Creating new one.")
+
+        if new_timestamp not in timestamps:
+            timestamps.append(new_timestamp)
+            timestamps.sort(reverse=True) # Newest first
+
+            try:
+                with open(index_file, 'w') as f:
+                    json.dump(timestamps, f)
+            except Exception as e:
+                io_manager.write_error(f"Failed to update index.json in {self.outdir}: {e}")

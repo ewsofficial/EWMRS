@@ -70,68 +70,17 @@ async function listFilesInDir(dirPath, limit = 50) {
   }
 }
 
-// GET /renders - lists files in GUI dirs
-// Optional query params:
-// - limit: number of files per directory (default 50)
-// - includeEmpty: if true, includes directories that exist but have no files
+// Use new RESTful routes
+const rendersRouter = require('./routes/renders');
+app.use('/renders', rendersRouter);
+
 // Root endpoint to avoid default express 404 "Cannot GET /"
 app.get('/', (req, res) => {
   res.json({
     service: 'EWMRS API',
     base_dir: BASE_DIR,
     gui_dir: GUI_DIR,
-    endpoints: ['/renders', '/healthz']
-  });
-});
-app.get('/renders', async (req, res) => {
-  const limit = parseInt(req.query.limit || '50', 10);
-  const includeEmpty = req.query.includeEmpty === 'true';
-
-  const result = {};
-
-  for (const sub of GUI_SUBDIRS) {
-    const dpath = path.join(GUI_DIR, sub);
-    const files = await listFilesInDir(dpath, limit);
-    if (files && files.length > 0) {
-      result[sub] = files;
-    } else if (files && includeEmpty) {
-      result[sub] = [];
-    } else if (files === null) {
-      // directory missing; include a small note
-      result[sub] = { error: 'missing', path: dpath };
-    }
-  }
-
-  res.json({ base_dir: BASE_DIR, gui_dir: GUI_DIR, renders: result });
-});
-
-// Serve an individual render file: /renders/:product/:file
-app.get('/renders/:product/:file', async (req, res) => {
-  const { product, file } = req.params;
-
-  if (!GUI_SUBDIRS.includes(product)) {
-    return res.status(404).json({ error: 'unknown product' });
-  }
-
-  const absGuiDir = path.resolve(GUI_DIR);
-  const requested = path.resolve(absGuiDir, product, file);
-
-  // Prevent path traversal: ensure requested path is inside the GUI directory
-  if (!requested.startsWith(absGuiDir + path.sep) && requested !== absGuiDir) {
-    return res.status(400).json({ error: 'invalid file path' });
-  }
-
-  try {
-    await fs.access(requested);
-  } catch (err) {
-    return res.status(404).json({ error: 'file not found' });
-  }
-
-  // Use express to send the file; set root to absGuiDir to be explicit
-  res.sendFile(requested, err => {
-    if (err) {
-      res.status(500).json({ error: 'failed to send file' });
-    }
+    endpoints: ['/renders/fetch/resources', '/renders/download/resources', '/healthz']
   });
 });
 
