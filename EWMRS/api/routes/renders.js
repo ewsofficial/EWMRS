@@ -13,6 +13,7 @@ const PRODUCT_MAPPING = {
   'PrecipRate': 'MRMS_PrecipRate',
   'VILDensity': 'MRMS_VILDensity',
   'QPE_01H': 'MRMS_QPE',
+  'VII': 'MRMS_VII',
   // Add other products as needed, these are the ones explicitly in config.py
   // For others in GUI_SUBDIRS (like NLDN, FLASH), assuming prefix might match or need adding.
   // Using a fallback strategy? The user wants "Keep the renders/download file lookup fast"

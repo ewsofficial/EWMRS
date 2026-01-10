@@ -42,5 +42,11 @@ file_list = [
         "colormap_key": "QPE_01H",
         "filepath": MRMS_QPE_DIR,
         "outdir": GUI_QPE_DIR
+    },
+    {
+        "name": "MRMS_VII",
+        "colormap_key": "VILDensity",
+        "filepath": MRMS_VII_DIR,
+        "outdir": GUI_VII_DIR
     }
 ]
