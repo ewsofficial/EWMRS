@@ -141,57 +141,6 @@ def cleanup_old_gui_files(max_age_minutes: int = 120):
         io_manager.write_info(f"Cleaned up {total_removed} old GUI files (>{max_age_minutes} min)")
 
 
-def update_global_manifest():
-    """Updates the global overlay_manifest.json with the latest available layers."""
-    from EWMRS.render.tools import OverlayManifestUtils
-    
-    manifest = OverlayManifestUtils()
-    
-    for layer in file_list:
-        name = layer.get("name")
-        colormap = layer.get("colormap_key")
-        out_dir = Path(layer.get("outdir"))
-        
-        # Check index.json for latest timestamp
-        index_file = out_dir / "index.json"
-        latest_ts = None
-        
-        if index_file.exists():
-            try:
-                with open(index_file, 'r') as f:
-                    timestamps = json.load(f)
-                    if timestamps:
-                        latest_ts = timestamps[0] # Newest first
-            except Exception as e:
-                io_manager.write_warning(f"Failed to read index for {name}: {e}")
-        
-        if latest_ts:
-            # Construct expected filename
-            # Filename format from render.py: f"{self.file_name}_{timestamp}.png"
-            png_name = f"{name}_{latest_ts}.png"
-            png_path_abs = out_dir / png_name
-            
-            # We need a relative path or a served path for the manifest?
-            # Typically manifests used by frontends need a URL or relative path.
-            # Assuming relative to the manifest file or just the filename if served from same root.
-            # For now, let's store the relative path from GUI_DIR.
-            try:
-                # relative_to throws if not relative
-                # fs.GUI_DIR is the parent of out_dir usually
-                rel_path = png_path_abs.relative_to(fs.GUI_DIR)
-                
-                # Add to manifest
-                # Note: latest_image argument name suggests a path
-                manifest.add_layer(name, colormap, str(rel_path), latest_ts)
-            except ValueError:
-                io_manager.write_warning(f"Could not make path relative for {name}: {png_path_abs}")
-        else:
-            # No recent file found
-            pass
-
-    manifest.save_to_json(fs.GUI_MANIFEST_JSON)
-
-
 def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dict[str, Optional[Path]]:
     """Run render pipeline for configured layers at the specified datetime.
 
@@ -221,9 +170,6 @@ def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dic
 
     # Clean up old GUI files (>120 min)
     cleanup_old_gui_files(max_age_minutes=120)
-
-    # Update global manifest
-    update_global_manifest()
 
     return results
 
