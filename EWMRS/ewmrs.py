@@ -94,6 +94,53 @@ def _render_layer(layer):
         return name, None
 
 
+def cleanup_old_gui_files(max_age_minutes: int = 120):
+    """Remove PNG files older than max_age_minutes from GUI output directories.
+    
+    Also cleans up stale entries from index.json files.
+    """
+    import time
+    
+    now = time.time()
+    max_age_seconds = max_age_minutes * 60
+    total_removed = 0
+    
+    for layer in file_list:
+        out_dir = Path(layer.get("outdir"))
+        if not out_dir.exists():
+            continue
+        
+        # Clean up old PNG files
+        for png_file in out_dir.glob("*.png"):
+            try:
+                file_age = now - png_file.stat().st_mtime
+                if file_age > max_age_seconds:
+                    png_file.unlink()
+                    total_removed += 1
+            except Exception as e:
+                io_manager.write_warning(f"Failed to remove {png_file}: {e}")
+        
+        # Update index.json to remove stale timestamps
+        index_file = out_dir / "index.json"
+        if index_file.exists():
+            try:
+                import json
+                with open(index_file, 'r') as f:
+                    timestamps = json.load(f)
+                
+                # Keep only timestamps that have corresponding PNG files
+                existing_pngs = {p.stem.split('_')[-1] for p in out_dir.glob("*.png")}
+                timestamps = [ts for ts in timestamps if ts in existing_pngs]
+                
+                with open(index_file, 'w') as f:
+                    json.dump(timestamps, f)
+            except Exception as e:
+                io_manager.write_warning(f"Failed to update index.json in {out_dir}: {e}")
+    
+    if total_removed > 0:
+        io_manager.write_info(f"Cleaned up {total_removed} old GUI files (>{max_age_minutes} min)")
+
+
 def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dict[str, Optional[Path]]:
     """Run render pipeline for configured layers at the specified datetime.
 
@@ -120,6 +167,9 @@ def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dic
         for future in as_completed(futures):
             name, png_path = future.result()
             results[name] = png_path
+
+    # Clean up old GUI files (>120 min)
+    cleanup_old_gui_files(max_age_minutes=120)
 
     return results
 
