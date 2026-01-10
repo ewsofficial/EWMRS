@@ -7,8 +7,13 @@ from ..util import file as fs
 from xarray import Dataset
 from ..util.io import IOManager
 from datetime import datetime
+import threading
 
 io_manager = IOManager("[Transform]")
+
+# Colormap cache to avoid re-reading JSON on every render
+_COLORMAP_CACHE = {}
+_COLORMAP_CACHE_LOCK = threading.Lock()
 
 class GUILayerRenderer:
     def __init__(self, dataset: Dataset, outdir: Path, colormap_key, file_name, timestamp):
@@ -28,24 +33,38 @@ class GUILayerRenderer:
 
     def _get_cmap(self):
         """
+        Returns cached colormap data to avoid re-reading JSON file.
+        
         Returns:
             thresholds (np.ndarray): array of dBZ or value thresholds
             colors (np.ndarray): array of RGB colors corresponding to thresholds
+            interpolate (bool): whether to interpolate between colors
         """
-        with open(fs.GUI_COLORMAP_JSON, 'r') as f:
-            cmaps_json = json.load(f)
-
-        # Iterate through all colormaps to find the matching key
-        for source in cmaps_json:
-            for cmap in source.get("colormaps", []):
-                if cmap.get("name") == self.colormap_key:
-                    thresholds = [t["value"] for t in cmap["thresholds"]]
-                    colors = [t["rgb"] for t in cmap["thresholds"]]
-                    interpolate = cmap.get("interpolate", True)
-                    return np.array(thresholds), np.array(colors, dtype=np.float32), interpolate
+        # Check cache first
+        if self.colormap_key in _COLORMAP_CACHE:
+            return _COLORMAP_CACHE[self.colormap_key]
         
-        # If key not found, raise an error with the path we tried
-        raise ValueError(f"Colormap '{self.colormap_key}' not found in {fs.GUI_COLORMAP_JSON}")
+        with _COLORMAP_CACHE_LOCK:
+            # Double-check after acquiring lock
+            if self.colormap_key in _COLORMAP_CACHE:
+                return _COLORMAP_CACHE[self.colormap_key]
+            
+            with open(fs.GUI_COLORMAP_JSON, 'r') as f:
+                cmaps_json = json.load(f)
+
+            # Iterate through all colormaps to find the matching key
+            for source in cmaps_json:
+                for cmap in source.get("colormaps", []):
+                    if cmap.get("name") == self.colormap_key:
+                        thresholds = np.array([t["value"] for t in cmap["thresholds"]])
+                        colors = np.array([t["rgb"] for t in cmap["thresholds"]], dtype=np.float32)
+                        interpolate = cmap.get("interpolate", True)
+                        result = (thresholds, colors, interpolate)
+                        _COLORMAP_CACHE[self.colormap_key] = result
+                        return result
+            
+            # If key not found, raise an error with the path we tried
+            raise ValueError(f"Colormap '{self.colormap_key}' not found in {fs.GUI_COLORMAP_JSON}")
 
     def convert_to_png(self):
         """
@@ -106,7 +125,7 @@ class GUILayerRenderer:
 
         # Create the image and save
         img = Image.fromarray(rgba, mode="RGBA")
-        img.save(png_file, optimize=True)
+        img.save(png_file, compress_level=1)  # Fast compression (1=fastest, 9=smallest)
 
         io_manager.write_debug(f"Saved {self.file_name} PNG file to {png_file}")
 

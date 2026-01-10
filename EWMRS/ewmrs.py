@@ -44,6 +44,56 @@ def _ensure_dt(dt_in) -> datetime:
     return dt
 
 
+def _render_layer(layer):
+    """Render a single layer. Returns (name, png_path or None).
+    
+    Module-level function for ProcessPoolExecutor compatibility.
+    """
+    from EWMRS.render.tools import TransformUtils
+    from EWMRS.render.render import GUILayerRenderer
+    from EWMRS.util.io import IOManager
+    
+    io_mgr = IOManager("[Pipeline]")
+    
+    name = layer.get("name")
+    colormap_key = layer.get("colormap_key")
+    src_dir = Path(layer.get("filepath"))
+    out_dir = Path(layer.get("outdir"))
+
+    io_mgr.write_debug(f"Processing layer {name}: src={src_dir}, out={out_dir}")
+
+    try:
+        if not src_dir.exists():
+            io_mgr.write_warning(f"Source directory missing for {name}: {src_dir}")
+            return name, None
+
+        # Find most recent file by modification time
+        candidate_files = [f for f in src_dir.glob("*") if f.is_file()]
+        if not candidate_files:
+            io_mgr.write_warning(f"No source files found for {name} in {src_dir}")
+            return name, None
+
+        latest_file = max(candidate_files, key=lambda f: f.stat().st_mtime)
+
+        io_mgr.write_info(f"Found latest file for {name}: {latest_file}")
+
+        ds = TransformUtils.load_ds(latest_file)
+        if ds is None:
+            io_mgr.write_error(f"Failed to load dataset for {latest_file}")
+            return name, None
+
+        timestamp_iso = TransformUtils.find_timestamp(str(latest_file))
+
+        renderer = GUILayerRenderer(ds, out_dir, colormap_key, name, timestamp_iso)
+        png_path, px_timestamp = renderer.convert_to_png()
+
+        return name, png_path
+
+    except Exception as e:
+        io_mgr.write_error(f"Error processing layer {name}: {e}")
+        return name, None
+
+
 def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dict[str, Optional[Path]]:
     """Run render pipeline for configured layers at the specified datetime.
 
@@ -51,6 +101,8 @@ def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dic
     all layers configured in `render.config.file_list` using the newest file
     available in each source `filepath`.
     """
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
     dt = _ensure_dt(dt)
     results: Dict[str, Optional[Path]] = {}
 
@@ -61,47 +113,13 @@ def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dic
         except Exception as e:
             io_manager.write_error(f"Download step failed: {e}")
 
-    for layer in file_list:
-        name = layer.get("name")
-        colormap_key = layer.get("colormap_key")
-        src_dir = Path(layer.get("filepath"))
-        out_dir = Path(layer.get("outdir"))
-
-        io_manager.write_debug(f"Processing layer {name}: src={src_dir}, out={out_dir}")
-
-        try:
-            if not src_dir.exists():
-                io_manager.write_warning(f"Source directory missing for {name}: {src_dir}")
-                results[name] = None
-                continue
-
-            # Find most recent file by modification time
-            candidate_files = [f for f in src_dir.glob("*") if f.is_file()]
-            if not candidate_files:
-                io_manager.write_warning(f"No source files found for {name} in {src_dir}")
-                results[name] = None
-                continue
-
-            latest_file = max(candidate_files, key=lambda f: f.stat().st_mtime)
-
-            io_manager.write_info(f"Found latest file for {name}: {latest_file}")
-
-            ds = TransformUtils.load_ds(latest_file)
-            if ds is None:
-                io_manager.write_error(f"Failed to load dataset for {latest_file}")
-                results[name] = None
-                continue
-
-            timestamp_iso = TransformUtils.find_timestamp(str(latest_file))
-
-            renderer = GUILayerRenderer(ds, out_dir, colormap_key, name, timestamp_iso)
-            png_path, px_timestamp = renderer.convert_to_png()
-
+    # Render layers in parallel using separate processes (true multi-core)
+    io_manager.write_info(f"Rendering {len(file_list)} layers across 4 CPU cores...")
+    with ProcessPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_render_layer, layer): layer for layer in file_list}
+        for future in as_completed(futures):
+            name, png_path = future.result()
             results[name] = png_path
-
-        except Exception as e:
-            io_manager.write_error(f"Error processing layer {name}: {e}")
-            results[name] = None
 
     return results
 

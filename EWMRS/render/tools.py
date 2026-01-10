@@ -9,6 +9,9 @@ from pyproj import Transformer
 
 io_manager = IOManager("[Transform]")
 
+# Cached transformer for EPSG:4326 to EPSG:3857 (thread-safe per pyproj docs)
+_TRANSFORMER_4326_TO_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+
 class TransformUtils:
     @staticmethod
     def load_ds(ds_path: Path, lat_limits=None, lon_limits=None):
@@ -108,8 +111,8 @@ class TransformUtils:
         Returns:
             xr.Dataset: Reprojected dataset with x/y coordinates in EPSG:3857
         """
-        # Create transformer from EPSG:4326 to EPSG:3857
-        transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        # Use cached transformer (thread-safe)
+        transformer = _TRANSFORMER_4326_TO_3857
         
         # Get lat/lon coordinate names
         lat_name = "latitude" if "latitude" in ds.coords else "lat"
