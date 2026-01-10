@@ -3,10 +3,24 @@ const fs = require('fs').promises;
 const path = require('path');
 const cors = require('cors');
 const morgan = require('morgan');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
 app.use(morgan('tiny'));
+app.use(helmet());
+app.use(compression());
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+app.use(limiter);
 
 // Determine BASE_DIR with parity to Python `util/file.py` behaviour but
 // supporting multiple environments:
@@ -80,7 +94,7 @@ app.get('/', (req, res) => {
     service: 'EWMRS API',
     base_dir: BASE_DIR,
     gui_dir: GUI_DIR,
-    endpoints: ['/renders/fetch/resources', '/renders/download/resources', '/healthz']
+    endpoints: ['/renders/get-items', '/renders/fetch', '/renders/download', '/healthz']
   });
 });
 

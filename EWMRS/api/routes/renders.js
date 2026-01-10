@@ -43,8 +43,42 @@ if (envBase) {
 }
 const GUI_DIR = path.join(BASE_DIR, 'gui');
 
-// GET /fetch/resources?product=PRODUCT
-router.get('/fetch/resources', async (req, res) => {
+// GET /get-items
+// Returns a JSON list of all products listed
+router.get('/get-items', async (req, res) => {
+  try {
+      // We can use Object.keys(PRODUCT_MAPPING) or check directories in GUI_DIR
+      // For now, let's return the supported products from the mapping which guarantees we know how to fetch them.
+      // However, the prompt says "all products listed", which might imply what is available on disk.
+      // But given the mapping is necessary for download, we should stick to what we support.
+      // To be safe and dynamic, we could check which of these directories actually exist.
+
+      // Let's list directories in GUI_DIR that are in PRODUCT_MAPPING
+      const products = [];
+      const keys = Object.keys(PRODUCT_MAPPING);
+
+      for (const key of keys) {
+          try {
+              const p = path.join(GUI_DIR, key);
+              const stat = await fs.stat(p);
+              if (stat.isDirectory()) {
+                  products.push(key);
+              }
+          } catch (e) {
+              // Ignore if not found
+          }
+      }
+
+      res.json(products);
+  } catch (err) {
+      console.error('Error in get-items:', err);
+      res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /fetch?product=[product]
+// Returns a list of all available timestamps of a specific product in YYYYMMDD-HHMMSS format
+router.get('/fetch', async (req, res) => {
   const product = req.query.product;
 
   if (!product) {
@@ -79,8 +113,9 @@ router.get('/fetch/resources', async (req, res) => {
   }
 });
 
-// GET /download/resources?product=PRODUCT&timestamp=TIMESTAMP
-router.get('/download/resources', async (req, res) => {
+// GET /download?product=[product]&timestamp=[timestamp]
+// Downloads a specific timestamp of a specific product
+router.get('/download', async (req, res) => {
   const { product, timestamp } = req.query;
 
   if (!product || !timestamp) {
@@ -88,7 +123,7 @@ router.get('/download/resources', async (req, res) => {
   }
 
   // Security checks
-  if (product.includes('..') || timestamp.includes('..')) {
+  if (product.includes('..') || timestamp.includes('..') || product.includes('/') || product.includes('\\') || timestamp.includes('/') || timestamp.includes('\\')) {
     return res.status(400).json({ error: 'Invalid parameters' });
   }
 
