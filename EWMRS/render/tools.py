@@ -172,7 +172,7 @@ class OverlayManifestUtils:
         self.bounds = {
             'north': 7361866,     # ~55°N in Web Mercator meters
             'south': 2273031,     # ~20°N in Web Mercator meters
-            'west': -14465442,    # ~-130°W in Web Mercator meters
+            'west': -14471534,    # ~-130°W in Web Mercator meters
             'east': -6679169      # ~-60°W in Web Mercator meters
         }
 

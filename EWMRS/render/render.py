@@ -125,7 +125,7 @@ class GUILayerRenderer:
 
         # Create the image and save
         img = Image.fromarray(rgba, mode="RGBA")
-        img.save(png_file, compress_level=1)  # Fast compression (1=fastest, 9=smallest)
+        img.save(png_file, compress_level=0)  # No compression for best quality
 
         io_manager.write_debug(f"Saved {self.file_name} PNG file to {png_file}")
 
