@@ -12,7 +12,7 @@ if platform.system() == "Windows":
     BASE_DIR = Path(r"C:\EWMRS")
 
 else:
-    BASE_DIR = Path(r"/workspaces/EWMRS")
+    BASE_DIR = Path.home() / "EWMRS"
 
 # ---------- PATH CONFIG ----------
 DATA_DIR = BASE_DIR / "data"

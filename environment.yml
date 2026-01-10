@@ -13,6 +13,8 @@ dependencies:
   - cfgrib
   - aiofiles
   - numpy
+  - pyproj
+  - pillow
   - pip:
     - pytest
     - pytest-cov
