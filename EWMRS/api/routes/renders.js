@@ -27,6 +27,8 @@ const PRODUCT_MAPPING = {
 // For now, let's grab it from process.env or re-calculate.
 // To keep it DRY, simple re-calc here or middleware injection in server.js?
 // Sticking to re-calc for independence.
+const os = require('os');
+
 const envBase = process.env.BASE_DIR;
 let BASE_DIR;
 if (envBase) {
@@ -34,12 +36,8 @@ if (envBase) {
 } else if (process.platform === 'win32') {
   BASE_DIR = 'C:\\EWMRS';
 } else {
-  const cwd = process.cwd() || '';
-  if (cwd.startsWith('/workspaces')) {
-    BASE_DIR = '/workspaces/EWMRS';
-  } else {
-    BASE_DIR = '/home/EWMRS';
-  }
+  // Match Python's Path.home() / "EWMRS" logic
+  BASE_DIR = path.join(os.homedir(), 'EWMRS');
 }
 const GUI_DIR = path.join(BASE_DIR, 'gui');
 
