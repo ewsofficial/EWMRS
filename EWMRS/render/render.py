@@ -72,8 +72,8 @@ class GUILayerRenderer:
         Reprojects data to EPSG:3857 (Web Mercator) projection.
         """
 
-        # Step 1: Reproject to EPSG:3857 (Web Mercator)
-        self.ds = TransformUtils.reproject_to_epsg3857(self.ds)
+        # Step 1: No Reprojection needed for 1km/pixel raw render
+        # We will resize the output image based on physical domain size later
         data = self.ds['unknown'].values
 
         # Step 2: Get colormap
@@ -101,7 +101,9 @@ class GUILayerRenderer:
             b = mapped_colors[:, 2]
         a = np.where(flat_data < 0, 0, 255)  # transparent for values < 0
 
-        # Reshape to original grid for 1:1 pixel correspondence
+        # Reshape to original grid
+        # Note: Grib data is often (lat, lon), where lat is row (y), lon is col (x)
+        # We want image to be (height, width) which corresponds to (lat, lon) shape
         rgba = np.stack([r, g, b, a], axis=1).reshape((data.shape[0], data.shape[1], 4)).astype(np.uint8)
 
         # Step 3: Generate and save
@@ -124,7 +126,17 @@ class GUILayerRenderer:
         png_file = self.outdir / f"{self.file_name}_{timestamp}.png"
 
         # Create the image and save
+        # Create the image
         img = Image.fromarray(rgba, mode="RGBA")
+        
+        # Calculate domain dimensions in km
+        width_km, height_km = TransformUtils.get_domain_dimensions_km(self.ds)
+        
+        # Resize image such that 1 pixel = 1 km
+        # Use BILINEAR for smooth resizing
+        target_size = (int(width_km), int(height_km))
+        img = img.resize(target_size, resample=Image.BILINEAR)
+
         img.save(png_file, compress_level=1)  # Fast compression (1=fastest, 9=smallest)
 
         io_manager.write_debug(f"Saved {self.file_name} PNG file to {png_file}")

@@ -101,57 +101,45 @@ class TransformUtils:
         return fallback
     
     @staticmethod
-    def reproject_to_epsg3857(ds):
+    def get_domain_dimensions_km(ds):
         """
-        Reproject an xarray Dataset from EPSG:4326 (WGS84) to EPSG:3857 (Web Mercator).
+        Calculates the width and height of the domain in kilometers.
         
         Args:
             ds (xr.Dataset): Dataset with latitude/longitude coordinates
             
         Returns:
-            xr.Dataset: Reprojected dataset with x/y coordinates in EPSG:3857
+            (width_km, height_km): Dimensions of the domain in km
         """
-        # Use cached transformer (thread-safe)
-        transformer = _TRANSFORMER_4326_TO_3857
-        
         # Get lat/lon coordinate names
         lat_name = "latitude" if "latitude" in ds.coords else "lat"
         lon_name = "longitude" if "longitude" in ds.coords else "lon"
         
-        # Extract coordinate values
-        lats = ds[lat_name].values
-        lons = ds[lon_name].values
+        # Get bounds
+        lat_min = float(ds[lat_name].min())
+        lat_max = float(ds[lat_name].max())
+        lon_min = float(ds[lon_name].min())
+        lon_max = float(ds[lon_name].max())
         
-        # Convert longitude from 0-360 to -180-180 if needed
-        lons_converted = np.where(lons > 180, lons - 360, lons)
+        # Approximate conversion (assuming spherical earth for simplicity or WGS84 approximation)
+        # 1 degree latitude ~= 111.32 km
+        height_km = (lat_max - lat_min) * 111.32
         
-        # Create 2D meshgrids for transformation
-        lon_grid, lat_grid = np.meshgrid(lons_converted, lats)
+        # 1 degree longitude ~= 40075 km * cos(lat) / 360
+        # Use average latitude for width calculation
+        avg_lat = (lat_min + lat_max) / 2
+        width_km = (lon_max - lon_min) * 40075 * np.cos(np.radians(avg_lat)) / 360
         
-        # Transform coordinates
-        x_grid, y_grid = transformer.transform(lon_grid, lat_grid)
-        
-        # Get the 1D x and y arrays (using the first row/column)
-        x = x_grid[0, :]  # First row (all x values)
-        y = y_grid[:, 0]  # First column (all y values)
-        
-        # Create new dataset with transformed coordinates
-        ds_reprojected = ds.copy()
-        
-        # Rename coordinates and update values
-        ds_reprojected = ds_reprojected.rename({lat_name: 'y', lon_name: 'x'})
-        ds_reprojected = ds_reprojected.assign_coords({
-            'x': ('x', x),
-            'y': ('y', y)
-        })
-        
-        # Add CRS information as attributes
-        ds_reprojected.attrs['crs'] = 'EPSG:3857'
-        ds_reprojected.attrs['crs_name'] = 'WGS 84 / Pseudo-Mercator'
-        
-        io_manager.write_debug("Reprojected dataset to EPSG:3857 (Web Mercator)")
-        
-        return ds_reprojected
+        return width_km, height_km
+
+    @staticmethod
+    def reproject_to_epsg3857(ds):
+        """
+        [DEPRECATED] Reproject an xarray Dataset from EPSG:4326 (WGS84) to EPSG:3857 (Web Mercator).
+        This method is kept for backward compatibility but is no longer used in the main render pipeline.
+        """
+        io_manager.write_warning("TransformUtils.reproject_to_epsg3857 is deprecated and should not be used.")
+        return ds
 
 
 class OverlayManifestUtils:
