@@ -101,38 +101,6 @@ class TransformUtils:
         return fallback
     
     @staticmethod
-    def get_domain_dimensions_km(ds):
-        """
-        Calculates the width and height of the domain in kilometers.
-        
-        Args:
-            ds (xr.Dataset): Dataset with latitude/longitude coordinates
-            
-        Returns:
-            (width_km, height_km): Dimensions of the domain in km
-        """
-        # Get lat/lon coordinate names
-        lat_name = "latitude" if "latitude" in ds.coords else "lat"
-        lon_name = "longitude" if "longitude" in ds.coords else "lon"
-        
-        # Get bounds
-        lat_min = float(ds[lat_name].min())
-        lat_max = float(ds[lat_name].max())
-        lon_min = float(ds[lon_name].min())
-        lon_max = float(ds[lon_name].max())
-        
-        # Approximate conversion (assuming spherical earth for simplicity or WGS84 approximation)
-        # 1 degree latitude ~= 111.32 km
-        height_km = (lat_max - lat_min) * 111.32
-        
-        # 1 degree longitude ~= 40075 km * cos(lat) / 360
-        # Use average latitude for width calculation
-        avg_lat = (lat_min + lat_max) / 2
-        width_km = (lon_max - lon_min) * 40075 * np.cos(np.radians(avg_lat)) / 360
-        
-        return width_km, height_km
-
-    @staticmethod
     def reproject_to_epsg3857(ds):
         """
         [DEPRECATED] Reproject an xarray Dataset from EPSG:4326 (WGS84) to EPSG:3857 (Web Mercator).

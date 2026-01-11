@@ -126,17 +126,8 @@ class GUILayerRenderer:
         png_file = self.outdir / f"{self.file_name}_{timestamp}.png"
 
         # Create the image and save
-        # Create the image
         img = Image.fromarray(rgba, mode="RGBA")
         
-        # Calculate domain dimensions in km
-        width_km, height_km = TransformUtils.get_domain_dimensions_km(self.ds)
-        
-        # Resize image such that 1 pixel = 1 km
-        # Use BILINEAR for smooth resizing
-        target_size = (int(width_km), int(height_km))
-        img = img.resize(target_size, resample=Image.BILINEAR)
-
         img.save(png_file, compress_level=1)  # Fast compression (1=fastest, 9=smallest)
 
         io_manager.write_debug(f"Saved {self.file_name} PNG file to {png_file}")
