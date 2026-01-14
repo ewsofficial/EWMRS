@@ -94,12 +94,23 @@ app.get('/', (req, res) => {
     service: 'EWMRS API',
     base_dir: BASE_DIR,
     gui_dir: GUI_DIR,
-    endpoints: ['/renders/get-items', '/renders/fetch', '/renders/download', '/healthz']
+    endpoints: ['/renders/get-items', '/renders/fetch', '/renders/download', '/healthz', '/colormaps']
   });
 });
 
 // Simple healthcheck
 app.get('/healthz', (req, res) => res.json({ ok: true }));
+
+// Return colormaps.json
+app.get('/colormaps', async (req, res) => {
+  try {
+    const colormapsPath = path.join(__dirname, '..', 'colormaps.json');
+    const data = await fs.readFile(colormapsPath, 'utf-8');
+    res.json(JSON.parse(data));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read colormaps.json', details: err.message });
+  }
+});
 
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
