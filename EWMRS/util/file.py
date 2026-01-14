@@ -4,7 +4,7 @@ import os
 import platform
 from datetime import datetime
 
-from util.io import IOManager
+from ..util.io import IOManager
 
 io_manager = IOManager("[Util]")
 

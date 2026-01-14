@@ -80,31 +80,37 @@ class GUILayerRenderer:
         thresholds, colors, interpolate = self._get_cmap()
 
         # Step 2.5: Apply colormap
-        flat_data = data.flatten()
+        # Use ravel() to avoid copy if possible, though digitize/interp might flatten anyway
+        flat_data = data.ravel()
+
+        # Pre-allocate output array (N, 4) in uint8 to save memory
+        N = flat_data.shape[0]
+        rgba_flat = np.empty((N, 4), dtype=np.uint8)
 
         if interpolate:
-            r = np.interp(flat_data, thresholds, colors[:, 0])
-            g = np.interp(flat_data, thresholds, colors[:, 1])
-            b = np.interp(flat_data, thresholds, colors[:, 2])
+            # Interpolate directly into the output array channels
+            # Casting to uint8 immediately saves memory compared to keeping full float arrays
+            rgba_flat[:, 0] = np.interp(flat_data, thresholds, colors[:, 0]).astype(np.uint8)
+            rgba_flat[:, 1] = np.interp(flat_data, thresholds, colors[:, 1]).astype(np.uint8)
+            rgba_flat[:, 2] = np.interp(flat_data, thresholds, colors[:, 2]).astype(np.uint8)
         else:
             # Discrete color mapping
             indices = np.digitize(flat_data, thresholds) - 1
             indices = np.clip(indices, 0, len(colors) - 1)
             
-            # Use gathered indices to fetch colors
-            # indices is an array of shape (N,)
-            # colors is (M, 3)
-            # colors[indices] is (N, 3)
-            mapped_colors = colors[indices]
-            r = mapped_colors[:, 0]
-            g = mapped_colors[:, 1]
-            b = mapped_colors[:, 2]
-        a = np.where(flat_data < 0, 0, 255)  # transparent for values < 0
+            # Cast colors table to uint8 once
+            colors_uint8 = colors.astype(np.uint8)
+
+            # Map directly into the output array
+            rgba_flat[:, :3] = colors_uint8[indices]
+
+        # Alpha channel: transparent for values < 0
+        rgba_flat[:, 3] = np.where(flat_data < 0, 0, 255).astype(np.uint8)
 
         # Reshape to original grid
         # Note: Grib data is often (lat, lon), where lat is row (y), lon is col (x)
         # We want image to be (height, width) which corresponds to (lat, lon) shape
-        rgba = np.stack([r, g, b, a], axis=1).reshape((data.shape[0], data.shape[1], 4)).astype(np.uint8)
+        rgba = rgba_flat.reshape((data.shape[0], data.shape[1], 4))
 
         # Step 3: Generate and save
         # Find timestamp
