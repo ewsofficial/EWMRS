@@ -73,7 +73,10 @@ def _render_layer(layer):
             io_mgr.write_warning(f"No source files found for {name} in {src_dir}")
             return name, None
 
-        latest_file = max(candidate_files, key=lambda f: f.stat().st_mtime)
+        # Optimization: Sort by filename instead of mtime.
+        # MRMS files contain timestamps in the name (e.g. YYYYMMDD-HHMMSS).
+        # Lexicographical sort is faster and equivalent to chronological sort for these files.
+        latest_file = max(candidate_files, key=lambda f: f.name)
 
         io_mgr.write_info(f"Found latest file for {name}: {latest_file}")
 

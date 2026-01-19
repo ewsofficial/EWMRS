@@ -84,9 +84,12 @@ def latest_files(dir, n):
     if not dir.exists():
         io_manager.write_warning(f"{dir} doesn't exist!")
         return
+    # Optimization: Sort by filename instead of mtime.
+    # MRMS and other product files have timestamps in their names (YYYYMMDD-HHMMSS).
+    # Sorting by name is significantly faster (no stat syscalls per file).
     files = sorted(
         [f for f in dir.glob("*") if f.is_file() and f.suffix.lower() != ".idx"],
-        key=lambda f: f.stat().st_mtime
+        key=lambda f: f.name
     )
     if len(files) < n:
         raise RuntimeError(f"Not enough files in {dir}")
