@@ -2,76 +2,140 @@ from pathlib import Path
 import sys
 import os
 import platform
+import argparse
 from datetime import datetime
 
 from ..util.io import IOManager
 
 io_manager = IOManager("[Util]")
 
-if platform.system() == "Windows":
-    BASE_DIR = Path(r"C:\EWMRS")
+# ---------- BASE DIRECTORY CONFIGURATION ----------
+# Default base directory (can be overridden via --base_dir argument)
+_DEFAULT_BASE_DIR = Path(r"C:\EWMRS") if platform.system() == "Windows" else Path.home() / "EWMRS"
 
+# Parse --base_dir from command line if present
+def _get_base_dir_from_args():
+    """Extract --base_dir from sys.argv without interfering with other argument parsers."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--base_dir", type=str, default=None, help="Base directory for EWMRS data")
+    args, _ = parser.parse_known_args()
+    if args.base_dir:
+        return Path(args.base_dir)
+    return None
+
+# Set BASE_DIR from argument or use default
+_arg_base_dir = _get_base_dir_from_args()
+if _arg_base_dir:
+    BASE_DIR = _arg_base_dir
+    io_manager.write_info(f"Using custom base directory: {BASE_DIR}")
 else:
-    BASE_DIR = Path.home() / "EWMRS"
+    BASE_DIR = _DEFAULT_BASE_DIR
 
-# ---------- PATH CONFIG ----------
-DATA_DIR = BASE_DIR / "data"
-MRMS_RALA_DIR = DATA_DIR / "RALA"
-MRMS_CGFLASH_DIR = DATA_DIR / "NLDN"
-MRMS_NLDN_DIR = DATA_DIR / "NLDN_Density"
-MRMS_ECHOTOP18_DIR = DATA_DIR / "EchoTop18"
-MRMS_ECHOTOP30_DIR = DATA_DIR / "EchoTop30"
-MRMS_QPE_DIR = DATA_DIR / "QPE_01H"
-MRMS_RAIN_DIR = DATA_DIR / "WarmRainProbability"
-MRMS_PRECIPRATE_DIR = DATA_DIR / "PrecipRate"
-MRMS_PROBSEVERE_DIR = DATA_DIR / "ProbSevere"
-MRMS_FLASH_DIR = DATA_DIR / "FLASH"
-MRMS_VIL_DIR = DATA_DIR / "VILDensity"
-MRMS_VII_DIR = DATA_DIR / "VII"
-MRMS_ROTATIONT_DIR = DATA_DIR / "RotationTrack30min"
-MRMS_COMPOSITE_DIR = DATA_DIR / "CompRefQC"
-MRMS_RHOHV_DIR = DATA_DIR / "RhoHV"
-MRMS_PRECIPTYP_DIR = DATA_DIR / "PrecipFlag"
-MRMS_MESH_DIR = DATA_DIR / "MESH"
-GOES_GLM_DIR = DATA_DIR / "GLM"
-STORMCELL_JSON = DATA_DIR / "stormcells.json"
+def set_base_dir(path):
+    """
+    Dynamically update the base directory and all derived paths.
+    
+    Args:
+        path (str or Path): New base directory path
+    """
+    global BASE_DIR, DATA_DIR, GUI_DIR
+    global MRMS_RALA_DIR, MRMS_CGFLASH_DIR, MRMS_NLDN_DIR, MRMS_ECHOTOP18_DIR
+    global MRMS_ECHOTOP30_DIR, MRMS_QPE_DIR, MRMS_RAIN_DIR, MRMS_PRECIPRATE_DIR
+    global MRMS_PROBSEVERE_DIR, MRMS_FLASH_DIR, MRMS_VIL_DIR, MRMS_VII_DIR
+    global MRMS_ROTATIONT_DIR, MRMS_COMPOSITE_DIR, MRMS_RHOHV_DIR, MRMS_PRECIPTYP_DIR
+    global MRMS_MESH_DIR, MRMS_AZSHEARLOW_DIR, MRMS_AZSHEARMID_DIR, GOES_GLM_DIR, STORMCELL_JSON
+    global GUI_RALA_DIR, GUI_NLDN_DIR, GUI_ECHOTOP18_DIR, GUI_ECHOTOP30_DIR
+    global GUI_QPE_DIR, GUI_PRECIPRATE_DIR, GUI_PROBSEVERE_DIR, GUI_FLASH_DIR
+    global GUI_VIL_DIR, GUI_VII_DIR, GUI_ROTATIONT_DIR, GUI_COMPOSITE_DIR
+    global GUI_RHOHV_DIR, GUI_PRECIPTYP_DIR, GUI_MAP_DIR, GUI_MANIFEST_JSON
+    
+    BASE_DIR = Path(path)
+    io_manager.write_info(f"Base directory updated to: {BASE_DIR}")
+    
+    # Reinitialize all paths
+    _init_paths()
 
-# ---------- GUI PATH CONFIG ----------
-GUI_DIR = BASE_DIR / "gui"
-GUI_RALA_DIR = GUI_DIR / "RALA"
-GUI_NLDN_DIR = GUI_DIR / "NLDN"
-GUI_ECHOTOP18_DIR = GUI_DIR / "EchoTop18"
-GUI_ECHOTOP30_DIR = GUI_DIR / "EchoTop30"
-GUI_QPE_DIR = GUI_DIR / "QPE_01H"
-GUI_PRECIPRATE_DIR = GUI_DIR / "PrecipRate"
-GUI_PROBSEVERE_DIR = GUI_DIR / "ProbSevere"
-GUI_FLASH_DIR = GUI_DIR / "FLASH"
-GUI_VIL_DIR = GUI_DIR / "VILDensity"
-GUI_VII_DIR = GUI_DIR / "VII"
-GUI_ROTATIONT_DIR = GUI_DIR / "RotationTrack30min"
-GUI_COMPOSITE_DIR = GUI_DIR / "CompRefQC"
-GUI_RHOHV_DIR = GUI_DIR / "RhoHV"
-GUI_PRECIPTYP_DIR = GUI_DIR / "PrecipFlag"
-GUI_MAP_DIR = GUI_DIR / "maps"
-GUI_MANIFEST_JSON = GUI_DIR / "overlay_manifest.json"
-# Attempt to locate `colormaps.json` in a few sensible places so the render
-# package can find it regardless of the current working directory.
-_cwd_candidate = Path.cwd() / "colormaps.json"
-_pkg_candidate = Path(__file__).resolve().parents[1] / "colormaps.json"  # EWMRS/colormaps.json
-_repo_candidate = Path(__file__).resolve().parents[2] / "colormaps.json"  # repo root/colormaps.json
-_gui_candidate = GUI_DIR / "colormaps.json"
+def _init_paths():
+    """Initialize all path variables based on current BASE_DIR."""
+    global DATA_DIR, GUI_DIR
+    global MRMS_RALA_DIR, MRMS_CGFLASH_DIR, MRMS_NLDN_DIR, MRMS_ECHOTOP18_DIR
+    global MRMS_ECHOTOP30_DIR, MRMS_QPE_DIR, MRMS_RAIN_DIR, MRMS_PRECIPRATE_DIR
+    global MRMS_PROBSEVERE_DIR, MRMS_FLASH_DIR, MRMS_VIL_DIR, MRMS_VII_DIR
+    global MRMS_ROTATIONT_DIR, MRMS_COMPOSITE_DIR, MRMS_RHOHV_DIR, MRMS_PRECIPTYP_DIR
+    global MRMS_MESH_DIR, MRMS_AZSHEARLOW_DIR, MRMS_AZSHEARMID_DIR, GOES_GLM_DIR, STORMCELL_JSON
+    global GUI_RALA_DIR, GUI_NLDN_DIR, GUI_ECHOTOP18_DIR, GUI_ECHOTOP30_DIR
+    global GUI_QPE_DIR, GUI_PRECIPRATE_DIR, GUI_PROBSEVERE_DIR, GUI_FLASH_DIR
+    global GUI_VIL_DIR, GUI_VII_DIR, GUI_ROTATIONT_DIR, GUI_COMPOSITE_DIR
+    global GUI_RHOHV_DIR, GUI_PRECIPTYP_DIR, GUI_MAP_DIR, GUI_MANIFEST_JSON
+    
+    # ---------- PATH CONFIG ----------
+    DATA_DIR = BASE_DIR / "data"
+    MRMS_RALA_DIR = DATA_DIR / "RALA"
+    MRMS_CGFLASH_DIR = DATA_DIR / "NLDN"
+    MRMS_NLDN_DIR = DATA_DIR / "NLDN_Density"
+    MRMS_ECHOTOP18_DIR = DATA_DIR / "EchoTop18"
+    MRMS_ECHOTOP30_DIR = DATA_DIR / "EchoTop30"
+    MRMS_QPE_DIR = DATA_DIR / "QPE_01H"
+    MRMS_RAIN_DIR = DATA_DIR / "WarmRainProbability"
+    MRMS_PRECIPRATE_DIR = DATA_DIR / "PrecipRate"
+    MRMS_PROBSEVERE_DIR = DATA_DIR / "ProbSevere"
+    MRMS_FLASH_DIR = DATA_DIR / "FLASH"
+    MRMS_VIL_DIR = DATA_DIR / "VILDensity"
+    MRMS_VII_DIR = DATA_DIR / "VII"
+    MRMS_ROTATIONT_DIR = DATA_DIR / "RotationTrack30min"
+    MRMS_COMPOSITE_DIR = DATA_DIR / "CompRefQC"
+    MRMS_RHOHV_DIR = DATA_DIR / "RhoHV"
+    MRMS_PRECIPTYP_DIR = DATA_DIR / "PrecipFlag"
+    MRMS_MESH_DIR = DATA_DIR / "MESH"
+    MRMS_AZSHEARLOW_DIR = DATA_DIR / "AzShearLow"
+    MRMS_AZSHEARMID_DIR = DATA_DIR / "AzShearMid"
+    GOES_GLM_DIR = DATA_DIR / "GLM"
+    STORMCELL_JSON = DATA_DIR / "stormcells.json"
+    
+    # ---------- GUI PATH CONFIG ----------
+    GUI_DIR = BASE_DIR / "gui"
+    GUI_RALA_DIR = GUI_DIR / "RALA"
+    GUI_NLDN_DIR = GUI_DIR / "NLDN"
+    GUI_ECHOTOP18_DIR = GUI_DIR / "EchoTop18"
+    GUI_ECHOTOP30_DIR = GUI_DIR / "EchoTop30"
+    GUI_QPE_DIR = GUI_DIR / "QPE_01H"
+    GUI_PRECIPRATE_DIR = GUI_DIR / "PrecipRate"
+    GUI_PROBSEVERE_DIR = GUI_DIR / "ProbSevere"
+    GUI_FLASH_DIR = GUI_DIR / "FLASH"
+    GUI_VIL_DIR = GUI_DIR / "VILDensity"
+    GUI_VII_DIR = GUI_DIR / "VII"
+    GUI_ROTATIONT_DIR = GUI_DIR / "RotationTrack30min"
+    GUI_COMPOSITE_DIR = GUI_DIR / "CompRefQC"
+    GUI_RHOHV_DIR = GUI_DIR / "RhoHV"
+    GUI_PRECIPTYP_DIR = GUI_DIR / "PrecipFlag"
+    GUI_MAP_DIR = GUI_DIR / "maps"
+    GUI_MANIFEST_JSON = GUI_DIR / "overlay_manifest.json"
 
-for _candidate in (_cwd_candidate, _pkg_candidate, _repo_candidate, _gui_candidate):
-    if _candidate.exists():
-        GUI_COLORMAP_JSON = _candidate
-        io_manager.write_debug(f"Using colormap JSON: {_candidate}")
-        break
-else:
-    # fallback to previous behavior (relative path) and warn
-    GUI_COLORMAP_JSON = Path("colormaps.json")
+# Initialize paths on module load
+_init_paths()
+
+# ---------- COLORMAP JSON LOOKUP ----------
+def _find_colormap_json():
+    """Locate colormaps.json in sensible locations."""
+    candidates = [
+        Path.cwd() / "colormaps.json",
+        Path(__file__).resolve().parents[1] / "colormaps.json",  # EWMRS/colormaps.json
+        Path(__file__).resolve().parents[2] / "colormaps.json",  # repo root/colormaps.json
+        GUI_DIR / "colormaps.json",
+    ]
+    
+    for candidate in candidates:
+        if candidate.exists():
+            io_manager.write_debug(f"Using colormap JSON: {candidate}")
+            return candidate
+    
     io_manager.write_warning("colormaps.json not found in common locations; using relative path 'colormaps.json'")
+    return Path("colormaps.json")
 
-# NEW LATEST FILES FUNCTION
+GUI_COLORMAP_JSON = _find_colormap_json()
+
+
+# ---------- FILE UTILITIES ----------
 def latest_files(dir, n):
     """
     Return the n most recent files in a directory as a list (oldest to newest), excluding .idx files
