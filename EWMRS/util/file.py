@@ -2,7 +2,6 @@ from pathlib import Path
 import sys
 import os
 import platform
-import argparse
 from datetime import datetime
 
 from ..util.io import IOManager
@@ -13,20 +12,10 @@ io_manager = IOManager("[Util]")
 # Default base directory (can be overridden via --base_dir argument)
 _DEFAULT_BASE_DIR = Path(r"C:\EWMRS") if platform.system() == "Windows" else Path.home() / "EWMRS"
 
-# Parse --base_dir from command line if present
-def _get_base_dir_from_args():
-    """Extract --base_dir from sys.argv without interfering with other argument parsers."""
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--base_dir", type=str, default=None, help="Base directory for EWMRS data")
-    args, _ = parser.parse_known_args()
-    if args.base_dir:
-        return Path(args.base_dir)
-    return None
-
-# Set BASE_DIR from argument or use default
-_arg_base_dir = _get_base_dir_from_args()
+# Get --base_dir from command line via IOManager
+_arg_base_dir = IOManager.get_base_dir_arg()
 if _arg_base_dir:
-    BASE_DIR = _arg_base_dir
+    BASE_DIR = Path(_arg_base_dir)
     io_manager.write_info(f"Using custom base directory: {BASE_DIR}")
 else:
     BASE_DIR = _DEFAULT_BASE_DIR

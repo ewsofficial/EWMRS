@@ -32,10 +32,27 @@ class IOManager:
     def __init__(self, header):
         self.header = header
     
+    @staticmethod
+    def get_base_dir_arg():
+        """
+        Extract --base_dir from sys.argv early, before full argument parsing.
+        Uses parse_known_args to avoid interfering with other arguments.
+        """
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("--base_dir", type=str, default=None, help="Base directory for EWMRS data")
+        args, _ = parser.parse_known_args()
+        return args.base_dir
+    
     def get_args(self):
         """Parse and validate EdgeWARN command-line arguments."""
         parser = argparse.ArgumentParser(description="EdgeWARN modifier specification")
 
+        parser.add_argument(
+            "--base_dir",
+            type=str,
+            default=None,
+            help="Base directory for EWMRS data (overrides default ~/EWMRS)"
+        )
         parser.add_argument(
             "--lat_limits",
             type=float,
