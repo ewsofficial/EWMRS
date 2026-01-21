@@ -53,3 +53,4 @@ def parse_goes_bucket_path(dt, product, hour_offset=0):
     path = f"{product}/{year}/{day_of_year}/{hour}/"
     
     return path
+

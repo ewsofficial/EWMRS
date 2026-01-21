@@ -1,15 +1,15 @@
-from .config import mrms_modifiers, goes_modifiers, gui_modifiers, bucket
-from .s3_sync import FileFinder, FileDownloader
-from .s3_async import AsyncFileFinder, AsyncFileDownloader
-from .parse import parse_goes_bucket_path
-from .downloader import (
+from EWMRS.ingest.mrms.config import get_mrms_modifiers, get_goes_modifiers, bucket
+from EWMRS.ingest.mrms.s3_sync import FileFinder, FileDownloader
+from EWMRS.ingest.mrms.s3_async import AsyncFileFinder, AsyncFileDownloader
+from EWMRS.ingest.mrms.parse import parse_goes_bucket_path
+from EWMRS.ingest.mrms.downloader import (
     download_all_files_async_internal,
     download_all_files_sync_fallback,
     download_all_goes_files,
     download_all_goes_files_async
 )
-from ..util.io import IOManager
-from ..util import file as fs
+from EWMRS.util.io import IOManager
+import EWMRS.util.file as fs
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import asyncio
 import aioboto3
@@ -19,7 +19,7 @@ import traceback
 
 io_manager = IOManager("[Ingest]")
 
-def download_all_files(dt, max_entries=10):
+def download_all_files(dt, max_entries=10, remove_old_files=True):
     """
     Main function for downloading all MRMS files.
 
@@ -28,12 +28,17 @@ def download_all_files(dt, max_entries=10):
     the same synchronous interface.
     """
     # Clear files first
+    mrms_modifiers = get_mrms_modifiers()
+    goes_modifiers_list = get_goes_modifiers()
+    
     folders = [outdir for _, _, outdir in mrms_modifiers]
     # Add GOES folders
-    folders.extend([outdir for _, outdir in goes_modifiers])
-    folders.extend(gui_modifiers)
-    for f in folders:
-        fs.clean_old_files(f, max_age_minutes=60)
+    folders.extend([outdir for _, outdir in goes_modifiers_list])
+    if remove_old_files:
+        for f in folders:
+            fs.clean_old_files(f, max_age_minutes=60)
+
+    # Use different function for stormcell dirs
 
     # Use async operations internally for better performance
     # This maintains the same API but with improved performance
@@ -51,9 +56,3 @@ def download_all_files(dt, max_entries=10):
         download_all_files_sync_fallback(dt, max_entries)
         # Fallback for GOES as well (synchronous)
         download_all_goes_files(dt, max_entries)
-
-if __name__ == "__main__":
-    # Test
-    from datetime import datetime, timezone
-    dt = datetime(2025, 12, 19, 10, 30, tzinfo=timezone.utc)
-    download_all_files(dt)

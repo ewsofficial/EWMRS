@@ -1,9 +1,9 @@
-from .config import mrms_modifiers, bucket, goes_modifiers, goes_bucket
-from .s3_sync import FileFinder, FileDownloader
-from .s3_async import AsyncFileFinder, AsyncFileDownloader
-from .parse import parse_mrms_bucket_path, parse_goes_bucket_path
-from .utils import merge_glm_files, extract_timestamp
-from ..util.io import IOManager
+from EWMRS.ingest.mrms.config import get_mrms_modifiers, bucket, get_goes_modifiers, goes_bucket
+from EWMRS.ingest.mrms.s3_sync import FileFinder, FileDownloader
+from EWMRS.ingest.mrms.s3_async import AsyncFileFinder, AsyncFileDownloader
+from EWMRS.ingest.mrms.parse import parse_mrms_bucket_path, parse_goes_bucket_path
+from EWMRS.ingest.mrms.utils import merge_glm_files, extract_timestamp
+from EWMRS.util.io import IOManager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import asyncio
 import aioboto3
@@ -20,7 +20,7 @@ async def download_all_files_async_internal(dt, max_entries):
         
         # Create async tasks for all modifiers
         tasks = []
-        for region, modifier, outdir in mrms_modifiers:
+        for region, modifier, outdir in get_mrms_modifiers():
             task = download_modifier_async(
                 region, modifier, outdir, dt, max_entries, s3
             )
@@ -73,10 +73,11 @@ async def download_modifier_async(region, modifier, outdir, dt, max_entries, s3_
 def download_all_files_sync_fallback(dt, max_entries):
     """Sync fallback for downloading all MRMS files"""
     # Multithread MRMS downloads
-    with ThreadPoolExecutor(max_workers=len(mrms_modifiers) + 2) as executor:
+    mrms_modifiers_list = get_mrms_modifiers()
+    with ThreadPoolExecutor(max_workers=len(mrms_modifiers_list) + 2) as executor:
         futures = [
             executor.submit(download_modifier_sync, region, modifier, outdir, dt, max_entries)
-            for region, modifier, outdir in mrms_modifiers
+            for region, modifier, outdir in mrms_modifiers_list
         ]
 
         for future in as_completed(futures):
@@ -275,9 +276,9 @@ async def _download_goes_product_async(product, outdir, dt, max_entries, hour_lo
             if "GLM" in product and len(processed_files) > 1:
                 io_manager.write_info(f"Merging {len(processed_files)} GLM files (Async)...")
                 
-                # merge_glm_files is synchronous, but that's okay for now as it's the final step
-                # If it blocks too long, we could wrap it in run_in_executor
-                merged_ds = merge_glm_files(processed_files, io_manager)
+                # merge_glm_files is synchronous, so we offload it to a thread pool
+                loop = asyncio.get_running_loop()
+                merged_ds = await loop.run_in_executor(None, merge_glm_files, processed_files, io_manager)
                 
                 if merged_ds:
                     # Find the newest timestamp among the files
@@ -337,10 +338,11 @@ def download_all_goes_files(dt, max_entries=10, hour_lookback=3):
     io_manager.write_info("Starting GOES-19 downloads...")
     
     # Use ThreadPoolExecutor for concurrent downloads
-    with ThreadPoolExecutor(max_workers=len(goes_modifiers)) as executor:
+    goes_modifiers_list = get_goes_modifiers()
+    with ThreadPoolExecutor(max_workers=len(goes_modifiers_list)) as executor:
         futures = [
             executor.submit(download_goes_product, product, outdir, dt, max_entries, hour_lookback)
-            for product, outdir in goes_modifiers
+            for product, outdir in goes_modifiers_list
         ]
         
         for future in as_completed(futures):
@@ -368,7 +370,7 @@ async def download_all_goes_files_async(dt, max_entries=10, hour_lookback=3):
         
         tasks = [
             _download_goes_product_async(product, outdir, dt, max_entries, hour_lookback, s3)
-            for product, outdir in goes_modifiers
+            for product, outdir in get_goes_modifiers()
         ]
         
         results = await asyncio.gather(*tasks, return_exceptions=True)

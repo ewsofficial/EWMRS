@@ -1,11 +1,13 @@
 import datetime
 import time
+import concurrent.futures
 from pathlib import Path
-from .ingest.s3_sync import FileFinder
-from .ingest.utils import extract_timestamp
-from .ingest.parse import parse_mrms_bucket_path
-from .ingest.config import bucket, check_modifiers, mrms_modifiers
-from .util.io import IOManager
+from EWMRS.ingest.mrms.s3_sync import FileFinder
+from EWMRS.ingest.mrms.utils import extract_timestamp
+from EWMRS.ingest.mrms.parse import parse_mrms_bucket_path
+from EWMRS.ingest.mrms.config import bucket
+from EWMRS.ingest.mrms.timestamp_utils import round_to_nearest_even_minute
+from EWMRS.util.io import IOManager
 
 io_manager = IOManager("[DataIngestion]")
 
@@ -60,6 +62,36 @@ class MRMSUpdateChecker:
             print(f"[MRMSUpdateChecker] Error checking {modifier}: {e}")
             return False
 
+    def _get_modifier_times(self, modifier_tuple, reference_dt):
+        """Helper to fetch timestamps for a single modifier."""
+        region, modifier, _ = modifier_tuple
+        finder = FileFinder(reference_dt, bucket, 20, io_manager)
+        bucket_path = parse_mrms_bucket_path(reference_dt, region, modifier)
+        try:
+            files_with_timestamps = finder.lookup_files(bucket_path, verbose=False)
+        except Exception as e:
+            if self.verbose:
+                 print(f"[{modifier}] Error looking up files: {e}")
+            return set()
+
+        if not files_with_timestamps:
+            if self.verbose:
+                print(f"[{modifier}] No remote files found")
+            return set()
+
+        processed_timestamps = []
+        for s3_path, ts in files_with_timestamps:
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=datetime.timezone.utc)
+            elif ts.tzinfo != datetime.timezone.utc:
+                ts = ts.astimezone(datetime.timezone.utc)
+            
+            ts_rounded = round_to_nearest_even_minute(ts)
+            processed_timestamps.append(ts_rounded)
+            
+        return set(processed_timestamps)
+
+
     def all_sources_available(self, modifiers):
         """Check all MRMS modifiers for new data availability."""
         all_new = True
@@ -83,31 +115,14 @@ class MRMSUpdateChecker:
 
         modifier_times = []
 
-        for region, modifier, _ in modifiers:
-            finder = FileFinder(reference_dt, bucket, 20, io_manager)
-            bucket_path = parse_mrms_bucket_path(reference_dt, region, modifier)
-            files_with_timestamps = finder.lookup_files(bucket_path, verbose=False)
-            if not files_with_timestamps:
-                if self.verbose:
-                    print(f"[{modifier}] No remote files found")
-                continue
-
-            # Process timestamps: ensure all are timezone-aware UTC
-            processed_timestamps = []
-            for s3_path, ts in files_with_timestamps:
-                # Ensure timestamp is timezone-aware UTC
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=datetime.timezone.utc)
-                elif ts.tzinfo != datetime.timezone.utc:
-                    # Convert to UTC if in different timezone
-                    ts = ts.astimezone(datetime.timezone.utc)
-                
-                ts_rounded = ts.replace(second=0, microsecond=0)
-                processed_timestamps.append(ts_rounded)
-                
-
-
-            modifier_times.append(set(processed_timestamps))
+        # Parallelize checks using ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # Map returns an iterator in the order of the inputs
+            results = executor.map(lambda m: self._get_modifier_times(m, reference_dt), modifiers)
+            
+            for res in results:
+                if res:
+                    modifier_times.append(res)
 
         if not modifier_times:
             if self.verbose:
