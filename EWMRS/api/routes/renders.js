@@ -14,64 +14,37 @@ const PRODUCT_MAPPING = {
   'VILDensity': 'MRMS_VILDensity',
   'QPE_01H': 'MRMS_QPE',
   'VII': 'MRMS_VII',
-  // Add other products as needed, these are the ones explicitly in config.py
-  // For others in GUI_SUBDIRS (like NLDN, FLASH), assuming prefix might match or need adding.
-  // Using a fallback strategy? The user wants "Keep the renders/download file lookup fast"
-  // so we should probably rely on this mapping.
-  // Let's add the rest based on convention if possible, or leave them for now
-  // until explicitly added in python config.
-  // For safety, we can try to guess or just support the ones we know.
 };
 
-// Base GUI Directory (injected or calculated essentially the same as server.js)
-// We need to access BASE_DIR. Ideally it's passed or available.
-// For now, let's grab it from process.env or re-calculate.
-// To keep it DRY, simple re-calc here or middleware injection in server.js?
-// Sticking to re-calc for independence.
-const os = require('os');
-
-const envBase = process.env.BASE_DIR;
-let BASE_DIR;
-if (envBase) {
-  BASE_DIR = envBase;
-} else if (process.platform === 'win32') {
-  BASE_DIR = 'C:\\EWMRS';
-} else {
-  // Match Python's Path.home() / "EWMRS" logic
-  BASE_DIR = path.join(os.homedir(), 'EWMRS');
+// Helper to get GUI_DIR from app.locals (set by server.js)
+function getGuiDir(req) {
+  return req.app.locals.GUI_DIR;
 }
-const GUI_DIR = path.join(BASE_DIR, 'gui');
 
 // GET /get-items
 // Returns a JSON list of all products listed
 router.get('/get-items', async (req, res) => {
   try {
-      // We can use Object.keys(PRODUCT_MAPPING) or check directories in GUI_DIR
-      // For now, let's return the supported products from the mapping which guarantees we know how to fetch them.
-      // However, the prompt says "all products listed", which might imply what is available on disk.
-      // But given the mapping is necessary for download, we should stick to what we support.
-      // To be safe and dynamic, we could check which of these directories actually exist.
+    const GUI_DIR = getGuiDir(req);
+    const products = [];
+    const keys = Object.keys(PRODUCT_MAPPING);
 
-      // Let's list directories in GUI_DIR that are in PRODUCT_MAPPING
-      const products = [];
-      const keys = Object.keys(PRODUCT_MAPPING);
-
-      for (const key of keys) {
-          try {
-              const p = path.join(GUI_DIR, key);
-              const stat = await fs.stat(p);
-              if (stat.isDirectory()) {
-                  products.push(key);
-              }
-          } catch (e) {
-              // Ignore if not found
-          }
+    for (const key of keys) {
+      try {
+        const p = path.join(GUI_DIR, key);
+        const stat = await fs.stat(p);
+        if (stat.isDirectory()) {
+          products.push(key);
+        }
+      } catch (e) {
+        // Ignore if not found
       }
+    }
 
-      res.json(products);
+    res.json(products);
   } catch (err) {
-      console.error('Error in get-items:', err);
-      res.status(500).json({ error: 'Internal server error' });
+    console.error('Error in get-items:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -79,6 +52,7 @@ router.get('/get-items', async (req, res) => {
 // Returns a list of all available timestamps of a specific product in YYYYMMDD-HHMMSS format
 router.get('/fetch', async (req, res) => {
   const product = req.query.product;
+  const GUI_DIR = getGuiDir(req);
 
   if (!product) {
     return res.status(400).json({ error: 'Missing product parameter' });
@@ -95,7 +69,7 @@ router.get('/fetch', async (req, res) => {
   try {
     const data = await fs.readFile(indexFile, 'utf8');
     const timestamps = JSON.parse(data);
-    
+
     // According to req "rounded down to the minute".
     // Our python script saves YYYYMMDD-HHMM00. 
     // This is effectively rounded down to the minute (seconds=00).
@@ -116,6 +90,7 @@ router.get('/fetch', async (req, res) => {
 // Downloads a specific timestamp of a specific product
 router.get('/download', async (req, res) => {
   const { product, timestamp } = req.query;
+  const GUI_DIR = getGuiDir(req);
 
   if (!product || !timestamp) {
     return res.status(400).json({ error: 'Missing product or timestamp parameter' });

@@ -22,29 +22,45 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Determine BASE_DIR with parity to Python `util/file.py` behaviour but
-// supporting multiple environments:
-// - If `BASE_DIR` env var is set, use it.
-// - On Windows: `C:\EWMRS`
-// - On Linux/macOS inside a GitHub/workspaces container (cwd starts with `/workspaces`):
-//   `/workspaces/EWMRS`
-// - Otherwise on Linux/macOS: `/home/EWMRS`
+// Parse --base_dir from command line arguments
+function getBaseDirFromArgs() {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--base_dir' && args[i + 1]) {
+      return args[i + 1];
+    }
+    if (args[i].startsWith('--base_dir=')) {
+      return args[i].split('=')[1];
+    }
+  }
+  return null;
+}
+
+// Determine BASE_DIR with parity to Python `util/file.py` behaviour:
+// Priority order:
+// 1. --base_dir command-line argument
+// 2. BASE_DIR environment variable
+// 3. Platform-specific defaults
+const argBase = getBaseDirFromArgs();
 const envBase = process.env.BASE_DIR;
 let BASE_DIR;
-if (envBase) {
+
+if (argBase) {
+  BASE_DIR = argBase;
+} else if (envBase) {
   BASE_DIR = envBase;
 } else if (process.platform === 'win32') {
   BASE_DIR = 'C:\\EWMRS';
 } else {
-  const cwd = process.cwd() || '';
-  if (cwd.startsWith('/workspaces')) {
-    BASE_DIR = '/workspaces/EWMRS';
-  } else {
-    BASE_DIR = '/home/EWMRS';
-  }
+  const os = require('os');
+  BASE_DIR = path.join(os.homedir(), 'EWMRS');
 }
 
 const GUI_DIR = path.join(BASE_DIR, 'gui');
+
+// Export BASE_DIR and GUI_DIR for use in routes
+module.exports.BASE_DIR = BASE_DIR;
+module.exports.GUI_DIR = GUI_DIR;
 
 // Known GUI subdirectories (keeps parity with util/file.py)
 const GUI_SUBDIRS = [
@@ -84,7 +100,10 @@ async function listFilesInDir(dirPath, limit = 50) {
   }
 }
 
-// Use new RESTful routes
+// Use new RESTful routes - pass BASE_DIR via app.locals
+app.locals.BASE_DIR = BASE_DIR;
+app.locals.GUI_DIR = GUI_DIR;
+
 const rendersRouter = require('./routes/renders');
 app.use('/renders', rendersRouter);
 
