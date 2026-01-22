@@ -107,6 +107,9 @@ app.locals.GUI_DIR = GUI_DIR;
 const rendersRouter = require('./routes/renders');
 app.use('/renders', rendersRouter);
 
+const wpcRouter = require('./routes/wpc');
+app.use('/wpc', wpcRouter);
+
 // Root endpoint to avoid default express 404 "Cannot GET /"
 app.get('/', (req, res) => {
   res.json({

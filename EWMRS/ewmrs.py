@@ -208,17 +208,32 @@ def pipeline(log_queue, dt, max_entries=10):
         log(f"ERROR: Pipeline failed - {e}")
 
 
+
+# ----------------- WPC Ingest Process -----------------
+def wpc_process(log_queue):
+    """Run WPC ingest in a separate process."""
+    from EWMRS.ingest.wpc.main import run_wpc_ingest
+    run_wpc_ingest(log_queue)
+
+
 def main(watch: bool = True, poll_interval: float = 15.0):
-    """If `watch` is True, poll MRMS sources for new common timestamps and spawn
-    a multiprocessing child process to run `pipeline` when a new timestamp appears.
+    """If `watch` is True, poll MRMS sources and WPC sources for new data.
+    Spawns multiprocessing child processes to run pipelines when new data appears.
     """
     print("Scheduler started. Press CTRL+C to exit.")
     checker = MRMSUpdateChecker(verbose=True)
     last_processed = None
+    
+    # WPC update tracking
+    last_wpc_check = 0
+    wpc_check_interval = 300  # Check every 5 minutes (data updates every 3 hours)
 
     try:
         while True:
+            now_ts = time.time()
             now = datetime.now(timezone.utc)
+            
+            # --- Check MRMS Updates ---
             latest_common = checker.latest_common_minute_1h(check_modifiers)
 
             if latest_common and latest_common != last_processed:
@@ -232,7 +247,7 @@ def main(watch: bool = True, poll_interval: float = 15.0):
                 # Spawn pipeline as a separate process
                 proc = multiprocessing.Process(target=pipeline, args=(log_queue, dt))
                 proc.start()
-                print(f"Spawned pipeline process PID={proc.pid}")
+                print(f"Spawned MRMS pipeline process PID={proc.pid}")
 
                 # Relay logs in real-time
                 while proc.is_alive() or not log_queue.empty():
@@ -241,13 +256,36 @@ def main(watch: bool = True, poll_interval: float = 15.0):
                     time.sleep(1)
 
                 proc.join()
-                print(f"Pipeline process PID={proc.pid} finished")
+                print(f"MRMS pipeline process PID={proc.pid} finished")
 
             else:
                 if not latest_common:
                     print("[Scheduler] WARN: No common timestamp available yet. Waiting ...")
                 else:
                     print(f"[Scheduler] DEBUG: Timestamp {latest_common} already processed. Waiting ...")
+
+            # --- Check WPC Updates ---
+            # Simple periodic check - the WPC module handles "latest" valid time logic
+            if now_ts - last_wpc_check > wpc_check_interval:
+                print("[Scheduler] Checking WPC Surface Analysis...")
+                
+                # Spawn WPC ingest as separate process
+                wpc_queue = multiprocessing.Queue()
+                wpc_proc = multiprocessing.Process(target=wpc_process, args=(wpc_queue,))
+                wpc_proc.start()
+                
+                print(f"Spawned WPC ingest process PID={wpc_proc.pid}")
+                
+                 # Relay logs (non-blocking if we wanted parallellism, but blocking is safer for logging)
+                while wpc_proc.is_alive() or not wpc_queue.empty():
+                    while not wpc_queue.empty():
+                        print(wpc_queue.get())
+                    time.sleep(1)
+                
+                wpc_proc.join()
+                print(f"WPC ingest process PID={wpc_proc.pid} finished")
+                
+                last_wpc_check = now_ts
 
             time.sleep(poll_interval)
 

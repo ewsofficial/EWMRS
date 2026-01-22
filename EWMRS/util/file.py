@@ -37,6 +37,7 @@ def set_base_dir(path):
     global GUI_QPE_DIR, GUI_PRECIPRATE_DIR, GUI_PROBSEVERE_DIR, GUI_FLASH_DIR
     global GUI_VIL_DIR, GUI_VII_DIR, GUI_ROTATIONT_DIR, GUI_COMPOSITE_DIR
     global GUI_RHOHV_DIR, GUI_PRECIPTYP_DIR, GUI_MAP_DIR, GUI_MANIFEST_JSON
+    global WPC_SFC_DIR  # [NEW]
     
     BASE_DIR = Path(path)
     io_manager.write_info(f"Base directory updated to: {BASE_DIR}")
@@ -56,6 +57,7 @@ def _init_paths():
     global GUI_QPE_DIR, GUI_PRECIPRATE_DIR, GUI_PROBSEVERE_DIR, GUI_FLASH_DIR
     global GUI_VIL_DIR, GUI_VII_DIR, GUI_ROTATIONT_DIR, GUI_COMPOSITE_DIR
     global GUI_RHOHV_DIR, GUI_PRECIPTYP_DIR, GUI_MAP_DIR, GUI_MANIFEST_JSON
+    global WPC_SFC_DIR  # [NEW]
     
     # ---------- PATH CONFIG ----------
     DATA_DIR = BASE_DIR / "data"
@@ -80,6 +82,8 @@ def _init_paths():
     MRMS_AZSHEARMID_DIR = DATA_DIR / "AzShearMid"
     GOES_GLM_DIR = DATA_DIR / "GLM"
     STORMCELL_JSON = DATA_DIR / "stormcells.json"
+    
+    WPC_SFC_DIR = BASE_DIR / "wpc" / "surface_analysis"  # [NEW]
     
     # ---------- GUI PATH CONFIG ----------
     GUI_DIR = BASE_DIR / "gui"
