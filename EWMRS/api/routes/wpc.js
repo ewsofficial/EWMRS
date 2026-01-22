@@ -16,41 +16,24 @@ function getWpcDir(req) {
 }
 
 /**
- * GET /wpc/surface-analysis
+ * GET /wpc/fetch
  * 
- * Returns the latest WPC surface analysis as GeoJSON.
+ * Query Params:
+ *   - type: 'sfc' (required)
+ * 
+ * Returns a list of available timestamps for the specified type.
  */
-router.get('/surface-analysis', async (req, res) => {
+router.get('/fetch', async (req, res) => {
     try {
-        const wpcDir = getWpcDir(req);
-        const latestPath = path.join(wpcDir, 'latest.geojson');
+        const type = req.query.type;
 
-        const data = await fs.readFile(latestPath, 'utf-8');
-        const geojson = JSON.parse(data);
-
-        res.json(geojson);
-    } catch (err) {
-        if (err.code === 'ENOENT') {
-            res.status(404).json({
-                error: 'Surface analysis not found',
-                message: 'No WPC surface analysis data available. The ingest process may not have run yet.'
-            });
-        } else {
-            res.status(500).json({
-                error: 'Failed to read surface analysis',
-                details: err.message
+        if (type !== 'sfc') {
+            return res.status(400).json({
+                error: 'Invalid type',
+                message: "Only 'sfc' type is currently supported"
             });
         }
-    }
-});
 
-/**
- * GET /wpc/surface-analysis/timestamps
- * 
- * Returns a list of available surface analysis timestamps.
- */
-router.get('/surface-analysis/timestamps', async (req, res) => {
-    try {
         const wpcDir = getWpcDir(req);
 
         const entries = await fs.readdir(wpcDir, { withFileTypes: true });
@@ -58,8 +41,8 @@ router.get('/surface-analysis/timestamps', async (req, res) => {
 
         for (const entry of entries) {
             if (entry.isFile() && entry.name.endsWith('.geojson') && entry.name !== 'latest.geojson') {
-                // Extract timestamp from filename: wpc_sfc_YYYYMMDD-HHz.geojson
-                const match = entry.name.match(/wpc_sfc_(\d{8}-\d{2}z)\.geojson/);
+                // Extract timestamp from filename: wpc_sfc_YYYYMMDD-HH0000.geojson
+                const match = entry.name.match(/wpc_sfc_(\d{8}-\d{6})\.geojson/);
                 if (match) {
                     timestamps.push(match[1]);
                 }
@@ -83,24 +66,44 @@ router.get('/surface-analysis/timestamps', async (req, res) => {
 });
 
 /**
- * GET /wpc/surface-analysis/:timestamp
+ * GET /wpc/download
  * 
- * Returns a specific surface analysis by timestamp.
+ * Query Params:
+ *   - type: 'sfc' (required)
+ *   - timestamp: YYYYMMDD-HH0000 (required)
+ * 
+ * Downloads the specific file matching the timestamp.
  */
-router.get('/surface-analysis/:timestamp', async (req, res) => {
+router.get('/download', async (req, res) => {
     try {
-        const wpcDir = getWpcDir(req);
-        const timestamp = req.params.timestamp;
+        const type = req.query.type;
+        const timestamp = req.query.timestamp;
 
-        // Validate timestamp format: YYYYMMDD-HHz
-        if (!/^\d{8}-\d{2}z$/.test(timestamp)) {
+        if (type !== 'sfc') {
             return res.status(400).json({
-                error: 'Invalid timestamp format',
-                message: 'Timestamp must be in YYYYMMDD-HHz format'
+                error: 'Invalid type',
+                message: "Only 'sfc' type is currently supported"
             });
         }
 
+        if (!timestamp) {
+            return res.status(400).json({
+                error: 'Missing timestamp',
+                message: 'Timestamp parameter is required'
+            });
+        }
+
+        // Validate timestamp format: YYYYMMDD-HH0000
+        if (!/^\d{8}-\d{6}$/.test(timestamp)) {
+            return res.status(400).json({
+                error: 'Invalid timestamp format',
+                message: 'Timestamp must be in YYYYMMDD-HH0000 format'
+            });
+        }
+
+        const wpcDir = getWpcDir(req);
         const filePath = path.join(wpcDir, `wpc_sfc_${timestamp}.geojson`);
+
         const data = await fs.readFile(filePath, 'utf-8');
         const geojson = JSON.parse(data);
 
@@ -108,12 +111,12 @@ router.get('/surface-analysis/:timestamp', async (req, res) => {
     } catch (err) {
         if (err.code === 'ENOENT') {
             res.status(404).json({
-                error: 'Surface analysis not found',
-                message: `No surface analysis found for timestamp: ${req.params.timestamp}`
+                error: 'File not found',
+                message: `No data found for timestamp: ${req.query.timestamp}`
             });
         } else {
             res.status(500).json({
-                error: 'Failed to read surface analysis',
+                error: 'Failed to download file',
                 details: err.message
             });
         }
