@@ -2,6 +2,7 @@
 
 import urllib.request
 import urllib.error
+import ssl
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 from pathlib import Path
@@ -74,7 +75,11 @@ def download_coded_surface(dt: Optional[datetime] = None) -> Optional[str]:
     io_manager.write_info(f"Downloading WPC surface analysis from: {url}")
     
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        with urllib.request.urlopen(url, timeout=30, context=ctx) as response:
             content = response.read().decode('utf-8', errors='replace')
             io_manager.write_info(f"Downloaded {len(content)} bytes")
             return content
@@ -117,7 +122,11 @@ def _try_fallback_download(dt: datetime, failed_hour: int) -> Optional[str]:
     io_manager.write_info(f"Trying fallback URL: {url}")
     
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        with urllib.request.urlopen(url, timeout=30, context=ctx) as response:
             content = response.read().decode('utf-8', errors='replace')
             io_manager.write_info(f"Fallback downloaded {len(content)} bytes")
             return content
@@ -146,7 +155,7 @@ def get_output_filepath(dt: Optional[datetime] = None) -> Path:
     # Ensure WPC_SFC_DIR exists (it is initialized in file.py but we should double check/create)
     WPC_SFC_DIR.mkdir(parents=True, exist_ok=True)
     
-    filename = f"wpc_sfc_{dt_valid.strftime('%Y%m%d')}-{valid_hour:02d}z.geojson"
+    filename = f"wpc_sfc_{dt_valid.strftime('%Y%m%d')}-{valid_hour:02d}0000.geojson"
     return WPC_SFC_DIR / filename
 
 

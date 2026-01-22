@@ -1,7 +1,7 @@
 """Main entry point for WPC Surface Analysis ingestion."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional, Dict
 
@@ -93,7 +93,14 @@ def run_wpc_ingest(log_queue=None):
         sys.stderr = QueueWriter(log_queue)
     
     try:
-        result = fetch_surface_analysis(save_timestamped=False)
+        # Fetch current (latest)
+        dt_now = datetime.now(timezone.utc)
+        result = fetch_surface_analysis(dt_now, save_timestamped=True)
+        
+        # Fetch previous (3 hours ago) to ensure coverage
+        dt_prev = dt_now - timedelta(hours=3)
+        fetch_surface_analysis(dt_prev, save_timestamped=True)
+        
         if result:
             io_manager.write_info("WPC surface analysis ingest completed successfully")
         else:
