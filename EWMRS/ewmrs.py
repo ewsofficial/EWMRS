@@ -14,6 +14,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from EWMRS.ingest.mrms.main import download_all_files
+from EWMRS.ingest.wpc.main import run_wpc_ingest
 from EWMRS.render.tools import TransformUtils
 from EWMRS.render.render import GUILayerRenderer
 from EWMRS.render.config import file_list
@@ -195,6 +196,13 @@ def pipeline(log_queue, dt, max_entries=10):
         except Exception as e:
             log(f"ERROR: Download failed - {e}")
 
+        # Run WPC Ingest
+        log("INFO: Starting WPC Ingest")
+        try:
+            run_wpc_ingest(log_queue)
+        except Exception as e:
+            log(f"ERROR: WPC Ingest failed - {e}")
+
         # Render using local files (download step above populates them)
         log("INFO: Starting Render step")
         try:
@@ -210,10 +218,7 @@ def pipeline(log_queue, dt, max_entries=10):
 
 
 # ----------------- WPC Ingest Process -----------------
-def wpc_process(log_queue):
-    """Run WPC ingest in a separate process."""
-    from EWMRS.ingest.wpc.main import run_wpc_ingest
-    run_wpc_ingest(log_queue)
+
 
 
 def main(watch: bool = True, poll_interval: float = 15.0):
@@ -223,10 +228,6 @@ def main(watch: bool = True, poll_interval: float = 15.0):
     print("Scheduler started. Press CTRL+C to exit.")
     checker = MRMSUpdateChecker(verbose=True)
     last_processed = None
-    
-    # WPC update tracking
-    last_wpc_check = 0
-    wpc_check_interval = 300  # Check every 5 minutes (data updates every 3 hours)
 
     try:
         while True:
@@ -263,29 +264,6 @@ def main(watch: bool = True, poll_interval: float = 15.0):
                     print("[Scheduler] WARN: No common timestamp available yet. Waiting ...")
                 else:
                     print(f"[Scheduler] DEBUG: Timestamp {latest_common} already processed. Waiting ...")
-
-            # --- Check WPC Updates ---
-            # Simple periodic check - the WPC module handles "latest" valid time logic
-            if now_ts - last_wpc_check > wpc_check_interval:
-                print("[Scheduler] Checking WPC Surface Analysis...")
-                
-                # Spawn WPC ingest as separate process
-                wpc_queue = multiprocessing.Queue()
-                wpc_proc = multiprocessing.Process(target=wpc_process, args=(wpc_queue,))
-                wpc_proc.start()
-                
-                print(f"Spawned WPC ingest process PID={wpc_proc.pid}")
-                
-                 # Relay logs (non-blocking if we wanted parallellism, but blocking is safer for logging)
-                while wpc_proc.is_alive() or not wpc_queue.empty():
-                    while not wpc_queue.empty():
-                        print(wpc_queue.get())
-                    time.sleep(1)
-                
-                wpc_proc.join()
-                print(f"WPC ingest process PID={wpc_proc.pid} finished")
-                
-                last_wpc_check = now_ts
 
             time.sleep(poll_interval)
 
