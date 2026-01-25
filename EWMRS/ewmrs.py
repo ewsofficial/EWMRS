@@ -229,6 +229,18 @@ def main(watch: bool = True, poll_interval: float = 15.0):
     checker = MRMSUpdateChecker(verbose=True)
     last_processed = None
 
+    # Load state
+    state_file = fs.BASE_DIR / "latest_processed.json"
+    if state_file.exists():
+        try:
+            with open(state_file, 'r') as f:
+                data = json.load(f)
+                if "last_processed" in data:
+                    last_processed = _ensure_dt(data["last_processed"])
+                    print(f"[Scheduler] Resuming from timestamp: {last_processed}")
+        except Exception as e:
+            print(f"[Scheduler] Failed to load state file: {e}")
+
     try:
         while True:
             now_ts = time.time()
@@ -241,6 +253,13 @@ def main(watch: bool = True, poll_interval: float = 15.0):
                 print(f"[Scheduler] DEBUG: New latest common timestamp: {latest_common}")
                 dt = latest_common
                 last_processed = latest_common
+
+                # Save state
+                try:
+                    with open(state_file, 'w') as f:
+                        json.dump({"last_processed": last_processed.isoformat()}, f)
+                except Exception as e:
+                    print(f"[Scheduler] Failed to save state file: {e}")
 
                 # Queue to capture logs from child process
                 log_queue = multiprocessing.Queue()
