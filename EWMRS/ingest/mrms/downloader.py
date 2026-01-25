@@ -1,6 +1,7 @@
 from EWMRS.ingest.mrms.config import get_mrms_modifiers, bucket, get_goes_modifiers, goes_bucket
 from EWMRS.ingest.mrms.s3_sync import FileFinder, FileDownloader
 from EWMRS.ingest.mrms.s3_async import AsyncFileFinder, AsyncFileDownloader
+from EWMRS.ingest.mrms.https_client import HttpsFileFinder, HttpsFileDownloader
 from EWMRS.ingest.mrms.parse import parse_mrms_bucket_path, parse_goes_bucket_path
 from EWMRS.ingest.mrms.utils import merge_glm_files, extract_timestamp
 from EWMRS.util.io import IOManager
@@ -52,14 +53,39 @@ async def download_modifier_async(region, modifier, outdir, dt, max_entries, s3_
             filename_prefix = f"MRMS_{modifier}_{dt.strftime('%Y%m%d-%H')}"
             bucket_path = f"{bucket_path}{filename_prefix}"
         
-        # Async file lookup
+        # Async file lookup (S3)
         file_list = await finder.async_lookup_files(bucket_path)
 
         if not file_list:
-            io_manager.write_warning(f"No files found for {bucket_path} at {dt}")
+            io_manager.write_warning(f"No files found in S3 for {bucket_path} at {dt}. Attempting HTTPS fallback...")
+            
+            # --- HTTPS FALLBACK ---
+            try:
+                https_finder = HttpsFileFinder(dt, io_manager)
+                https_file_list = await https_finder.find_files(region, modifier)
+                
+                if not https_file_list:
+                    io_manager.write_error(f"HTTPS Fallback failed: No files found for {modifier} at {dt}")
+                    return
+
+                https_downloader = HttpsFileDownloader(dt, io_manager)
+                downloaded = await https_downloader.download_matching(https_file_list, outdir)
+                
+                if downloaded:
+                     if downloaded.suffix == ".gz":
+                        await downloader.async_decompress_file(downloaded) # Reuse existing decompressor logic from s3_async downloader if possible or just use the local file path
+                        # Note: downloader.async_decompress_file expects a path, which matches what we return.
+                        # However, strictly speaking, AsyncFileDownloader method might belong to that instance. 
+                        # It is stateless regarding S3 for decompression, so it should work.
+                else:
+                    io_manager.write_error(f"HTTPS Fallback failed: Could not download matching file for {modifier}")
+
+            except Exception as e:
+                io_manager.write_error(f"HTTPS Fallback Exception: {e}")
+            
             return
         
-        # Download most recent file asynchronously
+        # Download most recent file asynchronously (S3)
         downloaded = await downloader.async_download_matching(file_list, outdir)
         if downloaded:
             if downloaded.suffix == ".gz":
@@ -95,6 +121,8 @@ def download_modifier_sync(region, modifier, outdir, dt, max_entries):
         bucket_path = parse_mrms_bucket_path(dt, region, modifier)
         
         # Optimization: Append filename prefix to search only this hour
+        # File format: MRMS_{modifier}_{YYYYMMDD}-{HH}MMSS
+        # This significantly reduces the search space for historical downloads
         filename_prefix = f"MRMS_{modifier}_{dt.strftime('%Y%m%d-%H')}"
         bucket_path = f"{bucket_path}{filename_prefix}"
         file_list = finder.lookup_files(bucket_path)
@@ -155,6 +183,7 @@ def download_goes_product(product, outdir, dt, max_entries=10, hour_lookback=3):
         
         # Download all matching files
         downloaded_files = downloader.download_all_matching(all_files, outdir)
+        
         
 
         

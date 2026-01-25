@@ -15,6 +15,9 @@ dependencies:
   - numpy
   - pyproj
   - pillow
+  - requests
+  - beautifulsoup4
+  - aiohttp
   - pip:
     - pytest
     - pytest-cov
