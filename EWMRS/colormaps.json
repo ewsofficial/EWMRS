@@ -155,6 +155,31 @@
                 {"value": 60, "rgb": [128, 128, 128]},
                 {"value": 70, "rgb": [64, 64, 64]}
             ]
+        },
+        {
+            "name": "AzShear",
+            "description": "Merged MRMS Azimuthal Shear",
+            "type": "AzShear",
+            "units": "0.001/s",
+            "interpolate": false,
+            "range": [0, 20],
+            "thresholds": [
+                {"value": 0, "rgb": [160, 160, 160]},
+                {"value": 3, "rgb": [120, 120, 120]},
+                {"value": 4, "rgb": [80, 80, 80]},
+                {"value": 5, "rgb": [119, 119, 0]},
+                {"value": 6, "rgb": [153, 153, 0]},
+                {"value": 7, "rgb": [187, 187, 0]},
+                {"value": 8, "rgb": [221, 221, 0]},
+                {"value": 9, "rgb": [255, 255, 0]},
+                {"value": 10, "rgb": [119, 0, 0]},
+                {"value": 11, "rgb": [153, 0, 0]},
+                {"value": 12, "rgb": [187, 0, 0]},
+                {"value": 13, "rgb": [221, 0, 0]},
+                {"value": 14, "rgb": [255, 0, 0]},
+                {"value": 15, "rgb": [255, 255, 255]},
+                {"value": 20, "rgb": [0, 255, 255]}
+            ]
         }
     ]
 }]
