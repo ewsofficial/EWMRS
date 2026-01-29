@@ -37,7 +37,7 @@ def set_base_dir(path):
     global GUI_QPE_DIR, GUI_PRECIPRATE_DIR, GUI_PROBSEVERE_DIR, GUI_FLASH_DIR
     global GUI_VIL_DIR, GUI_VII_DIR, GUI_ROTATIONT_DIR, GUI_COMPOSITE_DIR
     global GUI_RHOHV_DIR, GUI_PRECIPTYP_DIR, GUI_MAP_DIR, GUI_MANIFEST_JSON
-    global WPC_SFC_DIR  # [NEW]
+    global WPC_SFC_DIR, MRMS_AZSHEARLOW_DIR, MRMS_AZSHEARMID_DIR  # [NEW]
     
     BASE_DIR = Path(path)
     io_manager.write_info(f"Base directory updated to: {BASE_DIR}")
@@ -57,7 +57,7 @@ def _init_paths():
     global GUI_QPE_DIR, GUI_PRECIPRATE_DIR, GUI_PROBSEVERE_DIR, GUI_FLASH_DIR
     global GUI_VIL_DIR, GUI_VII_DIR, GUI_ROTATIONT_DIR, GUI_COMPOSITE_DIR
     global GUI_RHOHV_DIR, GUI_PRECIPTYP_DIR, GUI_MAP_DIR, GUI_MANIFEST_JSON
-    global WPC_SFC_DIR  # [NEW]
+    global WPC_SFC_DIR, MRMS_AZSHEARLOW_DIR, MRMS_AZSHEARMID_DIR  # [NEW]
     
     # ---------- PATH CONFIG ----------
     DATA_DIR = BASE_DIR / "data"
@@ -92,6 +92,8 @@ def _init_paths():
     GUI_ECHOTOP18_DIR = GUI_DIR / "EchoTop18"
     GUI_ECHOTOP30_DIR = GUI_DIR / "EchoTop30"
     GUI_QPE_DIR = GUI_DIR / "QPE_01H"
+    GUI_AZSHEARLOW_DIR = GUI_DIR / "AzShearLow"
+    GUI_AZSHEARMID_DIR = GUI_DIR / "AzShearMid"
     GUI_PRECIPRATE_DIR = GUI_DIR / "PrecipRate"
     GUI_PROBSEVERE_DIR = GUI_DIR / "ProbSevere"
     GUI_FLASH_DIR = GUI_DIR / "FLASH"
