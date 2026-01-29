@@ -54,6 +54,18 @@ def get_file_list():
             "colormap_key": "VILDensity",
             "filepath": fs.MRMS_VII_DIR,
             "outdir": fs.GUI_VII_DIR
+        },
+        {
+            "name": "MRMS_MergedAzShear_0-2kmAGL",
+            "colormap_key": "AzShear",
+            "filepath": fs.MRMS_AZSHEARLOW_DIR,
+            "outdir": fs.GUI_AZSHEARLOW_DIR
+        },
+        {
+            "name": "MRMS_MergedAzShear_3-6kmAGL",
+            "colormap_key": "AzShear",
+            "filepath": fs.MRMS_AZSHEARMID_DIR,
+            "outdir": fs.GUI_AZSHEARMID_DIR
         }
     ]
 

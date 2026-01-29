@@ -84,6 +84,10 @@ def _render_layer(layer):
             io_mgr.write_error(f"Failed to load dataset for {latest_file}")
             return name, None
 
+        # [NEW] Crop AzShear products to Reflectivity grid
+        if "MergedAzShear" in name:
+            ds = TransformUtils.crop_to_reflectivity(ds)
+
         timestamp_iso = TransformUtils.find_timestamp(str(latest_file))
 
         renderer = GUILayerRenderer(ds, out_dir, colormap_key, name, timestamp_iso)

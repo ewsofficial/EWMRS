@@ -110,6 +110,53 @@ class TransformUtils:
         return ds
 
 
+    @staticmethod
+    def crop_to_reflectivity(ds):
+        """
+        Crops/Aligns the input dataset to the standard MRMS composite grid.
+        
+        Grid Limits:
+        - Lat: 54.995 to 20.005 (Descending)
+        - Lon: 230.005 to 299.995 (Ascending)
+        - Step: 0.01
+        
+        Args:
+            ds (xr.Dataset): Input dataset
+            
+        Returns:
+            xr.Dataset: Cropped/Aligned dataset
+        """
+        # Create target coordinates
+        # Notice: Latitude is often stored descending in GRIB
+        # Using np.arange. careful with float precision or use linspace
+        # 54.995 -> 20.005 is span of 34.99. 3499 steps.
+        
+        # We start slightly above/below and use appropriate steps to ensure we hit the target points roughly
+        # Or even better, use explicit start/stop that aligns with 0.01 spacing.
+        
+        # 54.995 down to 20.005
+        lats = np.arange(54.995, 20.005 - 0.0001, -0.01)
+        
+        # 230.005 up to 299.995
+        lons = np.arange(230.005, 299.995 + 0.0001, 0.01)
+        
+        # Create a dummy DataArray for alignment
+        target_da = xr.DataArray(
+            coords={"latitude": lats, "longitude": lons},
+            dims=("latitude", "longitude")
+        )
+
+        try:
+             # Align
+             # method='nearest' is robust
+            aligned_ds = ds.interp_like(target_da, method='nearest')
+            io_manager.write_debug("Successfully cropped/aligned AzShear dataset to static grid.")
+            return aligned_ds
+        except Exception as e:
+            io_manager.write_error(f"Failed to align to static grid: {e}")
+            return ds
+
+    
 class OverlayManifestUtils:
     """
     Utility class to manage overlay manifest information for render layers.
