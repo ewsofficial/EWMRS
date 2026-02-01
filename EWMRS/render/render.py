@@ -104,8 +104,9 @@ class GUILayerRenderer:
             # Map directly into the output array
             rgba_flat[:, :3] = colors_uint8[indices]
 
-        # Alpha channel: transparent for values < 0
-        rgba_flat[:, 3] = np.where(flat_data < 0, 0, 255).astype(np.uint8)
+        # Alpha channel: transparent for values < first threshold
+        # This ensures that values below the defined range (like AzShear 0 when min is 1) are transparent
+        rgba_flat[:, 3] = np.where(flat_data < thresholds[0], 0, 255).astype(np.uint8)
 
         # Reshape to original grid
         # Note: Grib data is often (lat, lon), where lat is row (y), lon is col (x)

@@ -84,9 +84,11 @@ def _render_layer(layer):
             io_mgr.write_error(f"Failed to load dataset for {latest_file}")
             return name, None
 
-        # [NEW] Crop AzShear products to Reflectivity grid
+        # [NEW] Downsample AzShear products to standard MRMS grid (0.01 deg)
+        # Raw AzShear is 0.005 deg. We use 2x coarsen with max() to preserve peak values.
+        # coord_func='mean' ensures alignment: 20.0025 + 20.0075 -> 20.005 (Standard Grid)
         if "MergedAzShear" in name:
-            ds = TransformUtils.crop_to_reflectivity(ds)
+            ds = ds.coarsen(latitude=2, longitude=2, boundary='trim', coord_func='mean').max()
 
         timestamp_iso = TransformUtils.find_timestamp(str(latest_file))
 

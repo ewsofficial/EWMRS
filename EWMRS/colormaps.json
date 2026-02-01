@@ -164,7 +164,7 @@
             "interpolate": false,
             "range": [0, 20],
             "thresholds": [
-                {"value": 0, "rgb": [160, 160, 160]},
+                {"value": 1, "rgb": [160, 160, 160]},
                 {"value": 3, "rgb": [120, 120, 120]},
                 {"value": 4, "rgb": [80, 80, 80]},
                 {"value": 5, "rgb": [119, 119, 0]},
