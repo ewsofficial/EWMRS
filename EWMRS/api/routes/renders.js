@@ -14,6 +14,8 @@ const PRODUCT_MAPPING = {
   'VILDensity': 'MRMS_VILDensity',
   'QPE_01H': 'MRMS_QPE',
   'VII': 'MRMS_VII',
+  'AzShearLow': 'MRMS_MergedAzShear_0-2kmAGL',
+  'AzShearMid': 'MRMS_MergedAzShear_3-6kmAGL',
 };
 
 // Helper to get GUI_DIR from app.locals (set by server.js)

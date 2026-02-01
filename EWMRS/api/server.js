@@ -78,6 +78,8 @@ const GUI_SUBDIRS = [
   'CompRefQC',
   'RhoHV',
   'PrecipFlag',
+  'AzShearLow',
+  'AzShearMid',
   'maps'
 ];
 
