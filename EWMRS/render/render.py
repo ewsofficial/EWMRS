@@ -1,8 +1,10 @@
 from pathlib import Path
+from typing import Tuple, List
 import json
 import numpy as np
 from PIL import Image
 from .tools import TransformUtils
+from .tiler import TileSplitter, save_tile
 from ..util import file as fs
 from xarray import Dataset
 from ..util.io import IOManager
@@ -66,11 +68,18 @@ class GUILayerRenderer:
             # If key not found, raise an error with the path we tried
             raise ValueError(f"Colormap '{self.colormap_key}' not found in {fs.GUI_COLORMAP_JSON}")
 
-    def convert_to_png(self):
+    def convert_to_png(self, tile_output: bool = True) -> Tuple[List[Path], str]:
         """
-        Converts dataset to a png file and then saves it to outdir.
-        Reprojects data to EPSG:3857 (Web Mercator) projection.
+        Converts dataset to tiled PNG files or a single PNG file.
+        
+        Args:
+            tile_output: If True, output tiles in timestamp subdirectory.
+                        If False, output single PNG file (backward compatibility).
+        
+        Returns:
+            Tuple of (list of tile paths or [single png path], timestamp string).
         """
+        from .config import TILE_SIZE
 
         # Step 1: No Reprojection needed for 1km/pixel raw render
         # We will resize the output image based on physical domain size later
@@ -129,42 +138,113 @@ class GUILayerRenderer:
         # Ensure the output directory exists
         self.outdir.mkdir(parents=True, exist_ok=True)
 
-        # Define the full file path
-        png_file = self.outdir / f"{self.file_name}_{timestamp}.png"
-
-        # Create the image and save
-        img = Image.fromarray(rgba, mode="RGBA")
+        if tile_output:
+            # Tiled output: save tiles to timestamp subdirectory
+            tile_paths = self._save_tiles(rgba, timestamp)
+            
+            # Update index.json with new format
+            self._update_index(timestamp, tile_grid={
+                "rows": rgba.shape[0] // TILE_SIZE,
+                "cols": rgba.shape[1] // TILE_SIZE,
+                "tile_size": TILE_SIZE
+            })
+            
+            io_manager.write_debug(f"Saved {len(tile_paths)} tiles for {self.file_name} at {timestamp}")
+            return tile_paths, timestamp
+        else:
+            # Single PNG output (backward compatibility)
+            png_file = self.outdir / f"{self.file_name}_{timestamp}.png"
+            
+            img = Image.fromarray(rgba, mode="RGBA")
+            img.save(png_file, compress_level=1)  # Fast compression (1=fastest, 9=smallest)
+            
+            io_manager.write_debug(f"Saved {self.file_name} PNG file to {png_file}")
+            
+            # Update index.json with old format
+            self._update_index(timestamp, tile_grid=None)
+            
+            return [png_file], timestamp
+    
+    def _save_tiles(self, rgba: np.ndarray, timestamp: str) -> List[Path]:
+        """Save RGBA array as tiles in a timestamp subdirectory.
         
-        img.save(png_file, compress_level=1)  # Fast compression (1=fastest, 9=smallest)
+        Args:
+            rgba: RGBA image array of shape (height, width, 4).
+            timestamp: Timestamp string for the subdirectory name.
+        
+        Returns:
+            List of Path objects for all saved tiles.
+        """
+        from .config import TILE_SIZE
+        
+        # Create timestamp subdirectory
+        tile_dir = self.outdir / timestamp
+        tile_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Split into tiles
+        splitter = TileSplitter(rgba, tile_size=TILE_SIZE)
+        tiles = splitter.split()
+        
+        # Save each tile
+        tile_paths = []
+        for tile_x, tile_y, tile_data in tiles:
+            tile_filename = f"tile_{tile_x}_{tile_y}.png"
+            tile_path = tile_dir / tile_filename
+            save_tile(tile_data, str(tile_path))
+            tile_paths.append(tile_path)
+        
+        return tile_paths
 
-        io_manager.write_debug(f"Saved {self.file_name} PNG file to {png_file}")
-
-        # Update index.json
-        self._update_index(timestamp)
-
-        return png_file, timestamp
-
-    def _update_index(self, new_timestamp):
+    def _update_index(self, new_timestamp, tile_grid=None):
         """
         Updates the index.json file in the output directory with the new timestamp.
-        Maintains a sorted, unique list of timestamps.
+        Maintains a sorted, unique list of timestamps and optional tile grid info.
+        
+        Args:
+            new_timestamp: The timestamp string to add.
+            tile_grid: Optional dict with rows, cols, tile_size. If None, uses old format.
         """
         index_file = self.outdir / "index.json"
         timestamps = []
+        existing_tile_grid = None
 
         if index_file.exists():
             try:
                 with open(index_file, 'r') as f:
-                    timestamps = json.load(f)
+                    data = json.load(f)
+                
+                # Handle both old format (array) and new format (object)
+                if isinstance(data, list):
+                    timestamps = data
+                else:
+                    timestamps = data.get("timestamps", [])
+                    existing_tile_grid = data.get("tile_grid")
             except Exception as e:
                 io_manager.write_warning(f"Failed to read index.json in {self.outdir}: {e}. Creating new one.")
 
         if new_timestamp not in timestamps:
             timestamps.append(new_timestamp)
-            timestamps.sort(reverse=True) # Newest first
+            timestamps.sort(reverse=True)  # Newest first
 
             try:
+                # Build output data
+                if tile_grid is not None:
+                    # New format with tile grid info
+                    output_data = {
+                        "timestamps": timestamps,
+                        "tile_grid": tile_grid
+                    }
+                elif existing_tile_grid is not None:
+                    # Preserve existing tile_grid if not providing new one
+                    output_data = {
+                        "timestamps": timestamps,
+                        "tile_grid": existing_tile_grid
+                    }
+                else:
+                    # Old format (backward compatibility for single PNG mode)
+                    output_data = timestamps
+                
                 with open(index_file, 'w') as f:
-                    json.dump(timestamps, f)
+                    json.dump(output_data, f, indent=2)
             except Exception as e:
                 io_manager.write_error(f"Failed to update index.json in {self.outdir}: {e}")

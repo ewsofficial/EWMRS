@@ -103,11 +103,16 @@ def _render_layer(layer):
 
 
 def cleanup_old_gui_files(max_age_minutes: int = 120):
-    """Remove PNG files older than max_age_minutes from GUI output directories.
+    """Remove old files/folders from GUI output directories.
+    
+    Handles both:
+    - Old format: single PNG files (backward compatibility)
+    - New format: timestamp folders containing tiles
     
     Also cleans up stale entries from index.json files.
     """
     import time
+    import shutil
     
     now = time.time()
     max_age_seconds = max_age_minutes * 60
@@ -118,35 +123,76 @@ def cleanup_old_gui_files(max_age_minutes: int = 120):
         if not out_dir.exists():
             continue
         
-        # Clean up old PNG files
+        # Track existing timestamps for index.json update
+        existing_timestamps = set()
+        
+        # 1. Clean up old single PNG files (backward compatibility)
         for png_file in out_dir.glob("*.png"):
             try:
                 file_age = now - png_file.stat().st_mtime
                 if file_age > max_age_seconds:
                     png_file.unlink()
                     total_removed += 1
+                else:
+                    # Extract timestamp from filename for index tracking
+                    # Format: {prefix}_{timestamp}.png
+                    stem = png_file.stem
+                    if '_' in stem:
+                        ts = stem.split('_')[-1]
+                        existing_timestamps.add(ts)
             except Exception as e:
-                io_manager.write_warning(f"Failed to remove {png_file}: {e}")
+                io_manager.write_warning(f"Failed to process {png_file}: {e}")
         
-        # Update index.json to remove stale timestamps
+        # 2. Clean up old timestamp folders (new tile format)
+        for ts_folder in out_dir.iterdir():
+            if ts_folder.is_dir() and not ts_folder.name.startswith('.'):
+                try:
+                    folder_age = now - ts_folder.stat().st_mtime
+                    if folder_age > max_age_seconds:
+                        # Delete entire timestamp folder
+                        shutil.rmtree(ts_folder)
+                        total_removed += 1
+                        io_manager.write_debug(f"Removed old timestamp folder: {ts_folder}")
+                    else:
+                        # Track existing timestamp
+                        existing_timestamps.add(ts_folder.name)
+                except Exception as e:
+                    io_manager.write_warning(f"Failed to process folder {ts_folder}: {e}")
+        
+        # 3. Update index.json to remove stale timestamps
         index_file = out_dir / "index.json"
         if index_file.exists():
             try:
-                import json
                 with open(index_file, 'r') as f:
-                    timestamps = json.load(f)
+                    data = json.load(f)
                 
-                # Keep only timestamps that have corresponding PNG files
-                existing_pngs = {p.stem.split('_')[-1] for p in out_dir.glob("*.png")}
-                timestamps = [ts for ts in timestamps if ts in existing_pngs]
+                # Handle both old and new format
+                if isinstance(data, list):
+                    timestamps = data
+                    tile_grid = None
+                else:
+                    timestamps = data.get("timestamps", [])
+                    tile_grid = data.get("tile_grid")
+                
+                # Keep only timestamps that have corresponding files/folders
+                timestamps = [ts for ts in timestamps if ts in existing_timestamps]
+                
+                # Write back in appropriate format
+                if tile_grid is not None:
+                    output_data = {
+                        "timestamps": timestamps,
+                        "tile_grid": tile_grid
+                    }
+                else:
+                    output_data = timestamps
                 
                 with open(index_file, 'w') as f:
-                    json.dump(timestamps, f)
+                    json.dump(output_data, f)
             except Exception as e:
                 io_manager.write_warning(f"Failed to update index.json in {out_dir}: {e}")
     
     if total_removed > 0:
-        io_manager.write_info(f"Cleaned up {total_removed} old GUI files (>{max_age_minutes} min)")
+        io_manager.write_info(f"Cleaned up {total_removed} old GUI files/folders (>{max_age_minutes} min)")
 
 
 def run_render_pipeline(dt, max_entries: int = 10, download: bool = True) -> Dict[str, Optional[Path]]:

@@ -1,5 +1,10 @@
 from ..util import file as fs
 
+# Tile configuration constants
+TILE_SIZE = 250  # pixels
+TILE_GRID_ROWS = 14  # 3500 / 250
+TILE_GRID_COLS = 28  # 7000 / 250
+
 def get_file_list():
     """
     Get the render file configuration list.

@@ -70,7 +70,17 @@ router.get('/fetch', async (req, res) => {
 
   try {
     const data = await fs.readFile(indexFile, 'utf8');
-    const timestamps = JSON.parse(data);
+    const indexData = JSON.parse(data);
+
+    // Handle both old format (array) and new format (object)
+    let timestamps;
+    if (Array.isArray(indexData)) {
+      // Old format: just an array of timestamps
+      timestamps = indexData;
+    } else {
+      // New format: object with timestamps array
+      timestamps = indexData.timestamps || [];
+    }
 
     // According to req "rounded down to the minute".
     // Our python script saves YYYYMMDD-HHMM00. 
@@ -122,6 +132,133 @@ router.get('/download', async (req, res) => {
     res.sendFile(filePath);
   } catch (err) {
     res.status(404).json({ error: 'File not found' });
+  }
+});
+
+// GET /tile?product=[product]&timestamp=[timestamp]&x=[x]&y=[y]
+// Returns a specific tile for a product at a given timestamp
+// File path: {GUI_DIR}/{product}/{timestamp}/tile_{x}_{y}.png
+router.get('/tile', async (req, res) => {
+  const { product, timestamp, x, y } = req.query;
+  const GUI_DIR = getGuiDir(req);
+
+  // 1. Validate required parameters (same pattern as /download)
+  if (!product || !timestamp || x === undefined || y === undefined) {
+    return res.status(400).json({ error: 'Missing required parameters: product, timestamp, x, y' });
+  }
+
+  // 2. Security: Prevent directory traversal (same pattern as /download)
+  if (product.includes('..') || timestamp.includes('..') ||
+    product.includes('/') || product.includes('\\') ||
+    timestamp.includes('/') || timestamp.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid parameters' });
+  }
+
+  // 3. Validate product using existing mapping (same pattern as /download)
+  const filePrefix = PRODUCT_MAPPING[product];
+  if (!filePrefix) {
+    return res.status(404).json({ error: 'Unknown product or no mapping found' });
+  }
+
+  // 4. Validate x, y are integers
+  const xInt = parseInt(x, 10);
+  const yInt = parseInt(y, 10);
+  if (isNaN(xInt) || isNaN(yInt)) {
+    return res.status(400).json({ error: 'x and y must be integers' });
+  }
+
+  // 5. Get tile grid info from index.json for bounds checking
+  const indexFile = path.join(GUI_DIR, product, 'index.json');
+  let gridInfo = { rows: 14, cols: 28, tile_size: 250 }; // defaults
+  try {
+    const data = await fs.readFile(indexFile, 'utf8');
+    const indexData = JSON.parse(data);
+    if (indexData.tile_grid) {
+      gridInfo = indexData.tile_grid;
+    }
+  } catch (e) {
+    // Use defaults if index.json not found
+  }
+
+  // 6. Bounds check
+  if (xInt < 0 || xInt >= gridInfo.cols || yInt < 0 || yInt >= gridInfo.rows) {
+    return res.status(400).json({
+      error: `Tile coordinates out of bounds. Valid range: x=[0,${gridInfo.cols - 1}], y=[0,${gridInfo.rows - 1}]`
+    });
+  }
+
+  // 7. Construct tile path (follows new folder structure)
+  const tileFilename = `tile_${xInt}_${yInt}.png`;
+  const tilePath = path.join(GUI_DIR, product, timestamp, tileFilename);
+
+  // 8. Send file (same pattern as /download)
+  try {
+    await fs.access(tilePath);
+    res.sendFile(tilePath);
+  } catch (err) {
+    res.status(404).json({ error: 'Tile not found' });
+  }
+});
+
+// GET /tile-info?product=[product]
+// Returns tile grid configuration for a product
+router.get('/tile-info', async (req, res) => {
+  const { product } = req.query;
+  const GUI_DIR = getGuiDir(req);
+
+  // Same validation pattern as /fetch
+  if (!product) {
+    return res.status(400).json({ error: 'Missing product parameter' });
+  }
+
+  if (product.includes('..') || product.includes('/') || product.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid product name' });
+  }
+
+  // Validate product using existing mapping
+  const filePrefix = PRODUCT_MAPPING[product];
+  if (!filePrefix) {
+    return res.status(404).json({ error: 'Unknown product or no mapping found' });
+  }
+
+  const indexFile = path.join(GUI_DIR, product, 'index.json');
+
+  try {
+    const data = await fs.readFile(indexFile, 'utf8');
+    const indexData = JSON.parse(data);
+
+    // Handle both old format (array) and new format (object with tile_grid)
+    let timestamps = [];
+    let tileGrid = { rows: 14, cols: 28, tile_size: 250 };
+
+    if (Array.isArray(indexData)) {
+      // Old format: just an array of timestamps
+      timestamps = indexData;
+    } else {
+      // New format: object with timestamps and tile_grid
+      timestamps = indexData.timestamps || [];
+      tileGrid = indexData.tile_grid || tileGrid;
+    }
+
+    res.json({
+      product: product,
+      rows: tileGrid.rows,
+      cols: tileGrid.cols,
+      tile_size: tileGrid.tile_size,
+      timestamps: timestamps
+    });
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return res.json({
+        product: product,
+        rows: 14,
+        cols: 28,
+        tile_size: 250,
+        timestamps: []
+      });
+    }
+    console.error(`Error reading index.json for ${product}:`, err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
