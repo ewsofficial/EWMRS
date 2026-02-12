@@ -90,6 +90,46 @@ Streams the PNG file for the requested product and timestamp.
     - `image/png` file stream if found.
     - `{"error": "File not found"}` with 404 status if not found.
 
+#### 4. Get Tile
+`GET /renders/tile?product=[product_name]&timestamp=[timestamp]&x=[x]&y=[y]`
+
+Returns a single 250x250 PNG tile for the specified product, timestamp, and grid coordinates. The coordinate system uses (0,0) at the bottom-left corner.
+
+- **Parameters**:
+    - `product`: The name of the product (e.g., `CompRefQC`).
+    - `timestamp`: The timestamp in `YYYYMMDD-HHMMSS` format.
+    - `x`: Grid column index (0-based, left to right).
+    - `y`: Grid row index (0-based, bottom to top).
+
+- **Grid System**:
+    - Tile Size: 250x250 pixels
+    - Grid Dimensions: 28 columns (x=0..27) x 14 rows (y=0..13)
+    - Total Tiles: 392 per timestamp
+
+- **Response**:
+    - `image/png` file stream if found.
+    - `{"error": "Tile not found"}` with 404 status.
+    - `{"error": "Tile coordinates out of bounds"}` with 400 status.
+
+#### 5. Get Tile Grid Info
+`GET /renders/tile-info?product=[product_name]`
+
+Returns the grid configuration and available timestamps for the specified product.
+
+- **Parameters**:
+    - `product`: The name of the product.
+
+- **Response (JSON)**:
+    ```json
+    {
+      "product": "CompRefQC",
+      "rows": 14,
+      "cols": 28,
+      "tile_size": 250,
+      "timestamps": ["20260212-120000", ...]
+    }
+    ```
+
 ---
 
 ## Supported Products Reference
