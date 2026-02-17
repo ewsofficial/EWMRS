@@ -130,6 +130,15 @@ Returns the grid configuration and available timestamps for the specified produc
     }
     ```
 
+#### 6. Get Colormaps
+`GET /colormaps`
+
+Returns the content of the `colormaps.json` configuration file, which defines the color scales and thresholds for various products.
+
+- **Response (JSON)**:
+    - The full JSON content of `colormaps.json`.
+    - `{"error": "Failed to read colormaps.json"}` with 500 status if reading fails.
+
 ---
 
 ## Supported Products Reference

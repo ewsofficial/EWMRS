@@ -126,15 +126,8 @@ app.get('/', (req, res) => {
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 
 // Return colormaps.json
-app.get('/colormaps', async (req, res) => {
-  try {
-    const colormapsPath = path.join(__dirname, '..', 'colormaps.json');
-    const data = await fs.readFile(colormapsPath, 'utf-8');
-    res.json(JSON.parse(data));
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to read colormaps.json', details: err.message });
-  }
-});
+const colormapsRouter = require('./routes/colormaps');
+app.use('/colormaps', colormapsRouter);
 
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
