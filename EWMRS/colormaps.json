@@ -8,7 +8,7 @@
             "description": "Standard NWS dBZ reflectivity colormap",
             "type": "reflectivity",
             "units": "dBZ",
-            "interpolate": false, 
+            "interpolate": true, 
             "range": [0, 85],
             "thresholds": [
                 {"value": 0, "rgb": [35, 150, 190]},
@@ -65,7 +65,7 @@
             "name": "PrecipRate",
             "description": "PrecipRate color map",
             "type": "PrecipitationRate",
-            "interpolate": false, 
+            "interpolate": true, 
             "units": "mm",
             "range": [0, 177.8],
             "thresholds": [
@@ -99,7 +99,7 @@
             "description": "Radar-Only QPE estimates for the past 1 hour",
             "type": "QPE",
             "units": "mm",
-            "interpolate": false,
+            "interpolate": true,
             "range": [0, 177.8],
             "thresholds": [
                 {"value": 0.25, "rgb": [0, 236, 236]},
@@ -132,7 +132,7 @@
             "description": "Vertically integrated liquid density",
             "type": "VILDensity",
             "units": "g/m^3",
-            "interpolate": false,
+            "interpolate": true,
             "range": [0, 70],
             "thresholds": [
                 {"value": 0, "rgb": [0, 236, 236]},
