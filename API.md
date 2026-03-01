@@ -102,9 +102,15 @@ Returns a single 250x250 PNG tile for the specified product, timestamp, and grid
     - `y`: Grid row index (0-based, bottom to top).
 
 - **Grid System**:
-    - Tile Size: 250x250 pixels
-    - Grid Dimensions: 28 columns (x=0..27) x 14 rows (y=0..13)
-    - Total Tiles: 392 per timestamp
+    - **Projection**: EPSG:3857 (Web Mercator)
+    - **Tile Size**: 250x250 pixels
+    - **Grid Dimensions**: 28 columns (x=0..27) x 14 rows (y=0..13)
+    - **Total Tiles**: 392 per timestamp
+    - **Geographic Extent (Meters)**:
+        - West: `-14,471,533.8` (approx -130°W)
+        - East: `-6,679,169.5` (approx -60°W)
+        - South: `2,273,030.9` (approx 20°N)
+        - North: `7,361,866.1` (approx 55°N)
 
 - **Response**:
     - `image/png` file stream if found.
