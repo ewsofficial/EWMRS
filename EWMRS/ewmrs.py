@@ -69,8 +69,8 @@ def _render_layer(layer):
             io_mgr.write_warning(f"Source directory missing for {name}: {src_dir}")
             return name, None
 
-        # Find most recent file by modification time
-        candidate_files = [f for f in src_dir.glob("*") if f.is_file()]
+        # Find most recent file by modification time, excluding .idx files
+        candidate_files = [f for f in src_dir.glob("*") if f.is_file() and not f.name.endswith(".idx")]
         if not candidate_files:
             io_mgr.write_warning(f"No source files found for {name} in {src_dir}")
             return name, None
@@ -86,14 +86,36 @@ def _render_layer(layer):
 
         # [NEW] Downsample AzShear products to standard MRMS grid (0.01 deg)
         # Raw AzShear is 0.005 deg. We use 2x coarsen with max() to preserve peak values.
-        # coord_func='mean' ensures alignment: 20.0025 + 20.0075 -> 20.005 (Standard Grid)
-        if "MergedAzShear" in name:
-            ds = ds.coarsen(latitude=2, longitude=2, boundary='trim', coord_func='mean').max()
+        # This must be done BEFORE reprojection to ensure it matches the 0.01 deg grid.
+        if "MergedAzShear" in name and ds.latitude.values.shape[0] > 3510:
+             ds = ds.coarsen(latitude=2, longitude=2, boundary='trim', coord_func='mean').max()
+             io_mgr.write_info(f"Downsampled {name} to 0.01 deg grid")
+
+        # [NEW] Reproject to EPSG:3857 (Web Mercator) before rendering
+        import rioxarray
+        import rasterio.transform
+        from rasterio.enums import Resampling
+        if 'latitude' in ds.coords and 'longitude' in ds.coords:
+            # Precise meter bounds for 20-55N, -130 to -60W
+            WEST, SOUTH = -14471533.8, 2273030.9
+            EAST, NORTH = -6679169.5, 7361866.1
+            
+            ds.rio.write_crs("EPSG:4326", inplace=True)
+            # Use explicit shape and extent to ensure perfect alignment with fixed bounds
+            # Use Resampling.nearest to ensure 0 blur and preserve raw data values
+            ds = ds.rio.reproject(
+                "EPSG:3857",
+                shape=(3500, 7000),
+                transform=rasterio.transform.from_bounds(WEST, SOUTH, EAST, NORTH, 7000, 3500),
+                resampling=Resampling.nearest
+            )
+            io_mgr.write_info(f"Reprojected {name} to EPSG:3857 (Crisp nearest-neighbor, Precise bounds)")
 
         timestamp_iso = TransformUtils.find_timestamp(str(latest_file))
 
         renderer = GUILayerRenderer(ds, out_dir, colormap_key, name, timestamp_iso)
-        png_path, px_timestamp = renderer.convert_to_png()
+        # Tiling is now re-enabled for EPSG:3857 production use
+        png_path, px_timestamp = renderer.convert_to_png(tile_output=True)
 
         return name, png_path
 

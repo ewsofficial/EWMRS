@@ -8,7 +8,7 @@
             "description": "Standard NWS dBZ reflectivity colormap",
             "type": "reflectivity",
             "units": "dBZ",
-            "interpolate": true, 
+            "interpolate": false, 
             "range": [0, 85],
             "thresholds": [
                 {"value": 0, "rgb": [35, 150, 190]},

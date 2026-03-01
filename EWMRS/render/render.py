@@ -113,9 +113,9 @@ class GUILayerRenderer:
             # Map directly into the output array
             rgba_flat[:, :3] = colors_uint8[indices]
 
-        # Alpha channel: transparent for values < first threshold
-        # This ensures that values below the defined range (like AzShear 0 when min is 1) are transparent
-        rgba_flat[:, 3] = np.where(flat_data < thresholds[0], 0, 255).astype(np.uint8)
+        # Alpha channel: transparent for values < first threshold OR NaN
+        # This ensures that empty space from reprojection is correctly transparent
+        rgba_flat[:, 3] = np.where((flat_data < thresholds[0]) | np.isnan(flat_data), 0, 255).astype(np.uint8)
 
         # Reshape to original grid
         # Note: Grib data is often (lat, lon), where lat is row (y), lon is col (x)
@@ -139,17 +139,22 @@ class GUILayerRenderer:
         self.outdir.mkdir(parents=True, exist_ok=True)
 
         if tile_output:
+            # Single Image First (exactly like the verified verification plot)
+            img = Image.fromarray(rgba, mode="RGBA")
+            
             # Tiled output: save tiles to timestamp subdirectory
-            tile_paths = self._save_tiles(rgba, timestamp)
+            tile_paths = self._save_tiles_from_image(img, timestamp)
             
             # Update index.json with new format
+            rows = rgba.shape[0] // TILE_SIZE
+            cols = rgba.shape[1] // TILE_SIZE
             self._update_index(timestamp, tile_grid={
-                "rows": rgba.shape[0] // TILE_SIZE,
-                "cols": rgba.shape[1] // TILE_SIZE,
+                "rows": rows,
+                "cols": cols,
                 "tile_size": TILE_SIZE
             })
             
-            io_manager.write_debug(f"Saved {len(tile_paths)} tiles for {self.file_name} at {timestamp}")
+            io_manager.write_debug(f"Saved {len(tile_paths)} tiles from reprojected image for {self.file_name} at {timestamp}")
             return tile_paths, timestamp
         else:
             # Single PNG output (backward compatibility)
@@ -165,33 +170,46 @@ class GUILayerRenderer:
             
             return [png_file], timestamp
     
-    def _save_tiles(self, rgba: np.ndarray, timestamp: str) -> List[Path]:
-        """Save RGBA array as tiles in a timestamp subdirectory.
+    def _save_tiles_from_image(self, img: Image.Image, timestamp: str) -> List[Path]:
+        """Save PIL image as tiles in a timestamp subdirectory.
         
         Args:
-            rgba: RGBA image array of shape (height, width, 4).
+            img: Large PIL image (e.g. 3500x7000).
             timestamp: Timestamp string for the subdirectory name.
         
         Returns:
             List of Path objects for all saved tiles.
         """
         from .config import TILE_SIZE
+        width, height = img.size
+        grid_cols = width // TILE_SIZE
+        grid_rows = height // TILE_SIZE
         
         # Create timestamp subdirectory
         tile_dir = self.outdir / timestamp
         tile_dir.mkdir(parents=True, exist_ok=True)
         
-        # Split into tiles
-        splitter = TileSplitter(rgba, tile_size=TILE_SIZE)
-        tiles = splitter.split()
-        
-        # Save each tile
         tile_paths = []
-        for tile_x, tile_y, tile_data in tiles:
-            tile_filename = f"tile_{tile_x}_{tile_y}.png"
-            tile_path = tile_dir / tile_filename
-            save_tile(tile_data, str(tile_path))
-            tile_paths.append(tile_path)
+        # Tile Y=0 is at the bottom (South)
+        # PIL coordinates: (0, 0) is at the top (North)
+        for tile_y in range(grid_rows):
+            for tile_x in range(grid_cols):
+                # Calculate pixel box for cropping
+                # y=0 (bottom) -> bottom of image. y=13 (top) -> top of image.
+                # box = (left, top, right, bottom)
+                left = tile_x * TILE_SIZE
+                right = left + TILE_SIZE
+                
+                # invert Y for PIL cropping (which is top-down)
+                top = (grid_rows - 1 - tile_y) * TILE_SIZE
+                bottom = top + TILE_SIZE
+                
+                tile = img.crop((left, top, right, bottom))
+                
+                tile_filename = f"tile_{tile_x}_{tile_y}.png"
+                tile_path = tile_dir / tile_filename
+                tile.save(tile_path, compress_level=1)
+                tile_paths.append(tile_path)
         
         return tile_paths
 

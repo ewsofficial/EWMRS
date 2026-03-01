@@ -128,11 +128,13 @@ class OverlayManifestUtils:
         # East: -60° → ~-6,679,169 m
         # South: 20° → ~2,273,031 m
         # North: 55° → ~7,361,866 m
+        # Precise bounds in EPSG:3857 (Web Mercator) - in meters
+        # Exact conversion for: 20-55 N, -130 to -60 W
         self.bounds = {
-            'north': 7361866,     # ~55°N in Web Mercator meters
-            'south': 2273031,     # ~20°N in Web Mercator meters
-            'west': -14465442,    # ~-130°W in Web Mercator meters
-            'east': -6679169      # ~-60°W in Web Mercator meters
+            'north': 7361866.1,
+            'south': 2273030.9,
+            'west': -14471533.8,
+            'east': -6679169.5
         }
 
     def validate_bounds(self, bounds):
